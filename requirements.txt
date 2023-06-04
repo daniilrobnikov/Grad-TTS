@@ -1,6 +1,6 @@
 Cython==0.29.23
 numpy==1.19.5
-torch==1.9.0
+torch==1.11.0
 matplotlib==3.3.3
 einops==0.3.0
 inflect==5.0.2
