@@ -87,7 +87,7 @@ if __name__ == "__main__":
 
     print('Initializing optimizer...')
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate) # Change to AdamW optimizer (default: Adam)
-    Enable scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, verbose=True)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, verbose=True)
 
     print('Logging test batch...')
     test_batch = test_dataset.sample_test_batch(size=params.test_size)
