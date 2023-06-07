@@ -87,7 +87,7 @@ if __name__ == "__main__":
 
     print('Initializing optimizer...')
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate) # Change to AdamW optimizer (default: Adam)
-    # Enable scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, verbose=True)
+    Enable scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, verbose=True)
 
     print('Logging test batch...')
     test_batch = test_dataset.sample_test_batch(size=params.test_size)
@@ -137,6 +137,8 @@ if __name__ == "__main__":
                     progress_bar.set_description(msg)
                 
                 iteration += 1
+
+            scheduler.step(np.mean(dur_losses) + np.mean(prior_losses) + np.mean(diff_losses)) # Reduce learning rate if loss does not improve
 
         log_msg = 'Epoch %d: duration loss = %.3f ' % (epoch, np.mean(dur_losses))
         log_msg += '| prior loss = %.3f ' % np.mean(prior_losses)
