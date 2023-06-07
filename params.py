@@ -18,7 +18,6 @@ add_blank = True
 n_feats = 80
 n_spks = 1  # 247 for Libri-TTS filelist and 1 for LJSpeech
 spk_emb_dim = 64
-n_feats = 80
 n_fft = 1024
 sample_rate = 22050
 hop_length = 256

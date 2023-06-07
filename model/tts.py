@@ -101,7 +101,7 @@ class GradTTS(BaseModule):
     def compute_loss(self, x, x_lengths, y, y_lengths, spk=None, out_size=None):
         """
         Computes 3 losses:
-            1. duration loss: loss between predicted token durations and those extracted by Monotinic Alignment Search (MAS).
+            1. duration loss: loss between predicted token durations and those extracted by Monotonic Alignment Search (MAS).
             2. prior loss: loss between mel-spectrogram and encoder outputs.
             3. diffusion loss: loss between gaussian noise and its reconstruction by diffusion-based decoder.
             

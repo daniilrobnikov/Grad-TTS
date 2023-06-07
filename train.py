@@ -58,6 +58,7 @@ pe_scale = params.pe_scale
 
 if __name__ == "__main__":
     torch.manual_seed(random_seed)
+    torch.backends.cudnn.benchmark = True  # Enable CUDA optimization
     np.random.seed(random_seed)
 
     print('Initializing logger...')
@@ -82,9 +83,11 @@ if __name__ == "__main__":
     print('Number of encoder + duration predictor parameters: %.2fm' % (model.encoder.nparams/1e6))
     print('Number of decoder parameters: %.2fm' % (model.decoder.nparams/1e6))
     print('Total parameters: %.2fm' % (model.nparams/1e6))
+    print('Number of epochs: %d' % n_epochs)
 
     print('Initializing optimizer...')
-    optimizer = torch.optim.Adam(params=model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate) # Change to AdamW optimizer (default: Adam)
+    # Enable scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, verbose=True)
 
     print('Logging test batch...')
     test_batch = test_dataset.sample_test_batch(size=params.test_size)
@@ -106,28 +109,24 @@ if __name__ == "__main__":
                 model.zero_grad()
                 x, x_lengths = batch['x'].cuda(), batch['x_lengths'].cuda()
                 y, y_lengths = batch['y'].cuda(), batch['y_lengths'].cuda()
-                dur_loss, prior_loss, diff_loss = model.compute_loss(x, x_lengths,
-                                                                     y, y_lengths,
-                                                                     out_size=out_size)
-                loss = sum([dur_loss, prior_loss, diff_loss])
+
+                with torch.cuda.amp.autocast():  # Enable mixed-precision training
+                    dur_loss, prior_loss, diff_loss = model.compute_loss(x, x_lengths,
+                                                                        y, y_lengths,
+                                                                        out_size=out_size)
+                    
+                    loss = sum([dur_loss, prior_loss, diff_loss])
                 loss.backward()
 
-                enc_grad_norm = torch.nn.utils.clip_grad_norm_(model.encoder.parameters(),
-                                                               max_norm=1)
-                dec_grad_norm = torch.nn.utils.clip_grad_norm_(model.decoder.parameters(),
-                                                               max_norm=1)
+                enc_grad_norm = torch.nn.utils.clip_grad_norm_(model.encoder.parameters(), max_norm=1)
+                dec_grad_norm = torch.nn.utils.clip_grad_norm_(model.decoder.parameters(), max_norm=1)
                 optimizer.step()
 
-                logger.add_scalar('training/duration_loss', dur_loss.item(),
-                                  global_step=iteration)
-                logger.add_scalar('training/prior_loss', prior_loss.item(),
-                                  global_step=iteration)
-                logger.add_scalar('training/diffusion_loss', diff_loss.item(),
-                                  global_step=iteration)
-                logger.add_scalar('training/encoder_grad_norm', enc_grad_norm,
-                                  global_step=iteration)
-                logger.add_scalar('training/decoder_grad_norm', dec_grad_norm,
-                                  global_step=iteration)
+                logger.add_scalar('training/duration_loss', dur_loss.item(), global_step=iteration)
+                logger.add_scalar('training/prior_loss', prior_loss.item(), global_step=iteration)
+                logger.add_scalar('training/diffusion_loss', diff_loss.item(), global_step=iteration)
+                logger.add_scalar('training/encoder_grad_norm', enc_grad_norm, global_step=iteration)
+                logger.add_scalar('training/decoder_grad_norm', dec_grad_norm, global_step=iteration)
                 
                 dur_losses.append(dur_loss.item())
                 prior_losses.append(prior_loss.item())
