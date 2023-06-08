@@ -281,7 +281,7 @@ class Encoder(BaseModule):
             self.ffn_layers.append(FFN(hidden_channels, hidden_channels,
                                        filter_channels, kernel_size, p_dropout=p_dropout))
             self.norm_layers_2.append(LayerNorm(hidden_channels))
-        self.basic_norm = BasicNorm(hidden_channels)
+        self.basic_norm = BasicNorm(hidden_channels, channel_dim=1)
 
 
     def forward(self, x, x_mask):
