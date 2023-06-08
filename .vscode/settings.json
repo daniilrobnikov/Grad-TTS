@@ -6,6 +6,7 @@
     "python.formatting.blackArgs": [
         "--line-length=240",
         "--skip-string-normalization",
+        "--experimental-string-processing",
     ],
     "editor.formatOnSave": true
 }

@@ -359,7 +359,7 @@ class Encoder(BaseModule):
                 )
             )
             self.norm_layers_2.append(LayerNorm(hidden_channels))
-        self.basic_norm = BasicNorm(hidden_channels, channel_dim=1)
+        # self.basic_norm = BasicNorm(hidden_channels, channel_dim=1)
 
     def forward(self, x, x_mask):
         attn_mask = x_mask.unsqueeze(2) * x_mask.unsqueeze(-1)
@@ -371,7 +371,7 @@ class Encoder(BaseModule):
             y = self.ffn_layers[i](x, x_mask)
             y = self.drop(y)
             x = self.norm_layers_2[i](x + y)
-        x = self.basic_norm(x)
+        # x = self.basic_norm(x)
         x = x * x_mask
         return x
 

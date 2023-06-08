@@ -196,7 +196,7 @@ if __name__ == "__main__":
 
                 if batch_idx % 5 == 0:
                     msg = f"Epoch: {epoch}, iteration: {iteration} | dur_loss: {dur_loss.item()}, prior_loss: {prior_loss.item()}, diff_loss: {diff_loss.item()}"
-                    progress_bar.set_description(msg)
+                    progress_bar.set_description(desc=msg)
 
                 iteration += 1
 
@@ -205,14 +205,9 @@ if __name__ == "__main__":
                 np.mean(dur_losses) + np.mean(prior_losses) + np.mean(diff_losses)
             )
             msg = f"Epoch: {epoch}, iteration: {iteration} | dur_loss: {np.mean(dur_losses).item()}, prior_loss: {np.mean(prior_losses).item()}, diff_loss: {np.mean(diff_losses).item()}"
-            progress_bar.set_description(msg)
+            progress_bar.set_description(desc=msg)
 
-        log_msg = "Epoch %d: duration loss = %.3f " % (
-            epoch,
-            np.mean(dur_losses).item(),
-        )
-        log_msg += "| prior loss = %.3f " % np.mean(prior_losses).item()
-        log_msg += "| diffusion loss = %.3f\n" % np.mean(diff_losses).item()
+        log_msg = f"Epoch {epoch}: duration loss = {np.mean(dur_losses).item()} | prior loss = {np.mean(prior_losses).item()} | diffusion loss = {np.mean(diff_losses).item()}\n"
         with open(f"{log_dir}/train.log", "a") as f:
             f.write(log_msg)
 
