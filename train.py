@@ -138,7 +138,7 @@ if __name__ == "__main__":
                 
                 iteration += 1
 
-            scheduler.step(np.mean(dur_losses) + np.mean(prior_losses) + np.mean(diff_losses)) # Reduce learning rate if loss does not improve
+        scheduler.step(np.mean(dur_losses) + np.mean(prior_losses) + np.mean(diff_losses)) # Reduce learning rate if loss does not improve
 
         log_msg = 'Epoch %d: duration loss = %.3f ' % (epoch, np.mean(dur_losses))
         log_msg += '| prior loss = %.3f ' % np.mean(prior_losses)

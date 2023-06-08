@@ -1,11 +1,25 @@
 """ from https://github.com/jaywalnut310/glow-tts """
 
 import math
-
+import random # Enable BasicNorm
 import torch
 
 from model.base import BaseModule
 from model.utils import sequence_mask, convert_pad_shape
+
+from scaling import (
+    ActivationBalancer,
+    BasicNorm,
+    DoubleSwish,
+    Identity,
+    MaxEig,
+    ScaledConv1d,
+    Whiten,
+    _diag,
+    penalize_abs_values_gt,
+    random_clamp,
+    softmax,
+)
 
 
 class LayerNorm(BaseModule):
@@ -71,6 +85,8 @@ class DurationPredictor(BaseModule):
         self.filter_channels = filter_channels
         self.p_dropout = p_dropout
 
+        self.balancer = ActivationBalancer(filter_channels, channel_dim=1)
+        self.double_swish = DoubleSwish()
         self.drop = torch.nn.Dropout(p_dropout)
         self.conv_1 = torch.nn.Conv1d(in_channels, filter_channels, 
                                       kernel_size, padding=kernel_size//2)
@@ -82,11 +98,13 @@ class DurationPredictor(BaseModule):
 
     def forward(self, x, x_mask):
         x = self.conv_1(x * x_mask)
-        x = torch.relu(x)
+        x = self.balancer(x)
+        x = self.double_swish(x)
         x = self.norm_1(x)
         x = self.drop(x)
         x = self.conv_2(x * x_mask)
-        x = torch.relu(x)
+        x = self.balancer(x)
+        x = self.double_swish(x)
         x = self.norm_2(x)
         x = self.drop(x)
         x = self.proj(x * x_mask)
@@ -263,6 +281,8 @@ class Encoder(BaseModule):
             self.ffn_layers.append(FFN(hidden_channels, hidden_channels,
                                        filter_channels, kernel_size, p_dropout=p_dropout))
             self.norm_layers_2.append(LayerNorm(hidden_channels))
+        self.basic_norm = BasicNorm(hidden_channels)
+
 
     def forward(self, x, x_mask):
         attn_mask = x_mask.unsqueeze(2) * x_mask.unsqueeze(-1)
@@ -274,6 +294,7 @@ class Encoder(BaseModule):
             y = self.ffn_layers[i](x, x_mask)
             y = self.drop(y)
             x = self.norm_layers_2[i](x + y)
+        x = self.basic_norm(x)
         x = x * x_mask
         return x
 

@@ -48,5 +48,5 @@ n_epochs = 10000
 batch_size = 16
 learning_rate = 1e-4
 seed = 37
-save_every = 1
+save_every = 10
 out_size = fix_len_compatibility(2*22050//256)
