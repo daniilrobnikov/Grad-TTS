@@ -179,13 +179,17 @@ if __name__ == "__main__":
 
                 iteration += 1
 
-        mean_dur_loss = np.mean(dur_losses).item()
-        mean_prior_loss = np.mean(prior_losses).item()
-        mean_diff_loss = np.mean(diff_losses).item()
+            mean_dur_loss = np.mean(dur_losses).item()
+            mean_prior_loss = np.mean(prior_losses).item()
+            mean_diff_loss = np.mean(diff_losses).item()
+
+            log_msg = f"Epoch {epoch}, iteration: {iteration} | duration loss = {mean_dur_loss}, prior loss = {mean_prior_loss}, diffusion loss = {mean_diff_loss}"
+            progress_bar.set_description(desc=log_msg)
+            progress_bar.refresh()
+
         # Reduce learning rate if loss does not improve
         scheduler.step(mean_dur_loss + mean_prior_loss + mean_diff_loss)
 
-        log_msg = f"Epoch {epoch}: duration loss = {mean_dur_loss} | prior loss = {mean_prior_loss} | diffusion loss = {mean_diff_loss}"
         print(log_msg)
         with open(f"{log_dir}/train.log", "a") as f:
             f.write(log_msg + "\n")

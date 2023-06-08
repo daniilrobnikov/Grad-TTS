@@ -19,9 +19,7 @@ from model.utils import sequence_mask, generate_path, duration_loss, fix_len_com
 
 
 class GradTTS(BaseModule):
-    def __init__(self, n_vocab, n_spks, spk_emb_dim, n_enc_channels, filter_channels, filter_channels_dp, 
-                 n_heads, n_enc_layers, enc_kernel, enc_dropout, window_size, 
-                 n_feats, dec_dim, beta_min, beta_max, pe_scale):
+    def __init__(self, n_vocab, n_spks, spk_emb_dim, n_enc_channels, filter_channels, filter_channels_dp, n_heads, n_enc_layers, enc_kernel, enc_dropout, window_size, n_feats, dec_dim, beta_min, beta_max, pe_scale):
         super(GradTTS, self).__init__()
         self.n_vocab = n_vocab
         self.n_spks = n_spks
@@ -42,9 +40,7 @@ class GradTTS(BaseModule):
 
         if n_spks > 1:
             self.spk_emb = torch.nn.Embedding(n_spks, spk_emb_dim)
-        self.encoder = TextEncoder(n_vocab, n_feats, n_enc_channels, 
-                                   filter_channels, filter_channels_dp, n_heads, 
-                                   n_enc_layers, enc_kernel, enc_dropout, window_size)
+        self.encoder = TextEncoder(n_vocab, n_feats, n_enc_channels, filter_channels, filter_channels_dp, n_heads, n_enc_layers, enc_kernel, enc_dropout, window_size)
         self.decoder = Diffusion(n_feats, dec_dim, n_spks, spk_emb_dim, beta_min, beta_max, pe_scale)
 
     @torch.no_grad()
@@ -54,7 +50,7 @@ class GradTTS(BaseModule):
             1. encoder outputs
             2. decoder outputs
             3. generated alignment
-        
+
         Args:
             x (torch.Tensor): batch of texts, converted to a tensor with phoneme embedding ids.
             x_lengths (torch.Tensor): lengths of texts in batch.
@@ -104,7 +100,7 @@ class GradTTS(BaseModule):
             1. duration loss: loss between predicted token durations and those extracted by Monotonic Alignment Search (MAS).
             2. prior loss: loss between mel-spectrogram and encoder outputs.
             3. diffusion loss: loss between gaussian noise and its reconstruction by diffusion-based decoder.
-            
+
         Args:
             x (torch.Tensor): batch of texts, converted to a tensor with phoneme embedding ids.
             x_lengths (torch.Tensor): lengths of texts in batch.
@@ -118,7 +114,7 @@ class GradTTS(BaseModule):
         if self.n_spks > 1:
             # Get speaker embedding
             spk = self.spk_emb(spk)
-        
+
         # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
         mu_x, logw, x_mask = self.encoder(x, x_lengths, spk)
         y_max_length = y.shape[-1]
@@ -127,12 +123,12 @@ class GradTTS(BaseModule):
         attn_mask = x_mask.unsqueeze(-1) * y_mask.unsqueeze(2)
 
         # Use MAS to find most likely alignment `attn` between text and mel-spectrogram
-        with torch.no_grad(): 
+        with torch.no_grad():
             const = -0.5 * math.log(2 * math.pi) * self.n_feats
             factor = -0.5 * torch.ones(mu_x.shape, dtype=mu_x.dtype, device=mu_x.device)
-            y_square = torch.matmul(factor.transpose(1, 2), y ** 2)
+            y_square = torch.matmul(factor.transpose(1, 2), y**2)
             y_mu_double = torch.matmul(2.0 * (factor * mu_x).transpose(1, 2), y)
-            mu_square = torch.sum(factor * (mu_x ** 2), 1).unsqueeze(-1)
+            mu_square = torch.sum(factor * (mu_x**2), 1).unsqueeze(-1)
             log_prior = y_square - y_mu_double + mu_square + const
 
             attn = monotonic_align.maximum_path(log_prior, attn_mask.squeeze(1))
@@ -146,11 +142,8 @@ class GradTTS(BaseModule):
         if not isinstance(out_size, type(None)):
             max_offset = (y_lengths - out_size).clamp(0)
             offset_ranges = list(zip([0] * max_offset.shape[0], max_offset.cpu().numpy()))
-            out_offset = torch.LongTensor([
-                torch.tensor(random.choice(range(start, end)) if end > start else 0)
-                for start, end in offset_ranges
-            ]).to(y_lengths)
-            
+            out_offset = torch.LongTensor([torch.tensor(random.choice(range(start, end)) if end > start else 0) for start, end in offset_ranges]).to(y_lengths)
+
             attn_cut = torch.zeros(attn.shape[0], attn.shape[1], out_size, dtype=attn.dtype, device=attn.device)
             y_cut = torch.zeros(y.shape[0], self.n_feats, out_size, dtype=y.dtype, device=y.device)
             y_cut_lengths = []
@@ -162,7 +155,7 @@ class GradTTS(BaseModule):
                 attn_cut[i, :, :y_cut_length] = attn[i, :, cut_lower:cut_upper]
             y_cut_lengths = torch.LongTensor(y_cut_lengths)
             y_cut_mask = sequence_mask(y_cut_lengths).unsqueeze(1).to(y_mask)
-            
+
             attn = attn_cut
             y = y_cut
             y_mask = y_cut_mask
@@ -173,9 +166,9 @@ class GradTTS(BaseModule):
 
         # Compute loss of score-based decoder
         diff_loss, xt = self.decoder.compute_loss(y, y_mask, mu_y, spk)
-        
+
         # Compute loss between aligned encoder outputs and mel-spectrogram
         prior_loss = torch.sum(0.5 * ((y - mu_y) ** 2 + math.log(2 * math.pi)) * y_mask)
         prior_loss = prior_loss / (torch.sum(y_mask) * self.n_feats)
-        
+
         return dur_loss, prior_loss, diff_loss
