@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 import torch
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard.writer import SummaryWriter
 
 import params
 from model import GradTTS
@@ -61,116 +61,192 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True  # Enable CUDA optimization
     np.random.seed(random_seed)
 
-    print('Initializing logger...')
+    print("Initializing logger...")
     logger = SummaryWriter(log_dir=log_dir)
 
-    print('Initializing data loaders...')
-    train_dataset = TextMelDataset(train_filelist_path, cmudict_path, add_blank,
-                                   n_fft, n_feats, sample_rate, hop_length,
-                                   win_length, f_min, f_max)
+    print("Initializing data loaders...")
+    train_dataset = TextMelDataset(
+        train_filelist_path,
+        cmudict_path,
+        add_blank,
+        n_fft,
+        n_feats,
+        sample_rate,
+        hop_length,
+        win_length,
+        f_min,
+        f_max,
+    )
     batch_collate = TextMelBatchCollate()
-    loader = DataLoader(dataset=train_dataset, batch_size=batch_size,
-                        collate_fn=batch_collate, drop_last=True,
-                        num_workers=4, shuffle=False)
-    test_dataset = TextMelDataset(valid_filelist_path, cmudict_path, add_blank,
-                                  n_fft, n_feats, sample_rate, hop_length,
-                                  win_length, f_min, f_max)
+    loader = DataLoader(
+        dataset=train_dataset,
+        batch_size=batch_size,
+        collate_fn=batch_collate,
+        drop_last=True,
+        num_workers=4,
+        shuffle=False,
+    )
+    test_dataset = TextMelDataset(
+        valid_filelist_path,
+        cmudict_path,
+        add_blank,
+        n_fft,
+        n_feats,
+        sample_rate,
+        hop_length,
+        win_length,
+        f_min,
+        f_max,
+    )
 
-    print('Initializing model...')
-    model = GradTTS(nsymbols, 1, None, n_enc_channels, filter_channels, filter_channels_dp, 
-                    n_heads, n_enc_layers, enc_kernel, enc_dropout, window_size, 
-                    n_feats, dec_dim, beta_min, beta_max, pe_scale).cuda()
-    print('Number of encoder + duration predictor parameters: %.2fm' % (model.encoder.nparams/1e6))
-    print('Number of decoder parameters: %.2fm' % (model.decoder.nparams/1e6))
-    print('Total parameters: %.2fm' % (model.nparams/1e6))
-    print('Number of epochs: %d' % n_epochs)
+    print("Initializing model...")
+    model = GradTTS(
+        nsymbols,
+        1,
+        None,
+        n_enc_channels,
+        filter_channels,
+        filter_channels_dp,
+        n_heads,
+        n_enc_layers,
+        enc_kernel,
+        enc_dropout,
+        window_size,
+        n_feats,
+        dec_dim,
+        beta_min,
+        beta_max,
+        pe_scale,
+    ).cuda()
+    print(
+        "Number of encoder + duration predictor parameters: %.2fm"
+        % (model.encoder.nparams / 1e6)
+    )
+    print("Number of decoder parameters: %.2fm" % (model.decoder.nparams / 1e6))
+    print("Total parameters: %.2fm" % (model.nparams / 1e6))
+    print("Number of epochs: %d" % n_epochs)
 
-    print('Initializing optimizer...')
-    optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate) # Change to AdamW optimizer (default: Adam)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, verbose=True)
+    print("Initializing optimizer...")
+    # Change to AdamW optimizer (default: Adam)
+    optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="min", factor=0.5, patience=5, verbose=True
+    )
 
-    print('Logging test batch...')
+    print("Logging test batch...")
     test_batch = test_dataset.sample_test_batch(size=params.test_size)
     for i, item in enumerate(test_batch):
-        mel = item['y']
-        logger.add_image(f'image_{i}/ground_truth', plot_tensor(mel.squeeze()),
-                         global_step=0, dataformats='HWC')
-        save_plot(mel.squeeze(), f'{log_dir}/original_{i}.png')
+        mel = item["y"]
+        logger.add_image(
+            f"image_{i}/ground_truth",
+            plot_tensor(mel.squeeze()),
+            global_step=0,
+            dataformats="HWC",
+        )
+        save_plot(mel.squeeze(), f"{log_dir}/original_{i}.png")
 
-    print('Start training...')
+    print("Start training...")
     iteration = 0
     for epoch in range(1, n_epochs + 1):
         model.train()
         dur_losses = []
         prior_losses = []
         diff_losses = []
-        with tqdm(loader, total=len(train_dataset)//batch_size) as progress_bar:
+        with tqdm(loader, total=len(train_dataset) // batch_size) as progress_bar:
             for batch_idx, batch in enumerate(progress_bar):
                 model.zero_grad()
-                x, x_lengths = batch['x'].cuda(), batch['x_lengths'].cuda()
-                y, y_lengths = batch['y'].cuda(), batch['y_lengths'].cuda()
+                x, x_lengths = batch["x"].cuda(), batch["x_lengths"].cuda()
+                y, y_lengths = batch["y"].cuda(), batch["y_lengths"].cuda()
 
                 with torch.cuda.amp.autocast():  # Enable mixed-precision training
-                    dur_loss, prior_loss, diff_loss = model.compute_loss(x, x_lengths,
-                                                                        y, y_lengths,
-                                                                        out_size=out_size)
-                    
+                    dur_loss, prior_loss, diff_loss = model.compute_loss(
+                        x, x_lengths, y, y_lengths, out_size=out_size
+                    )
+
                     loss = sum([dur_loss, prior_loss, diff_loss])
                 loss.backward()
 
-                enc_grad_norm = torch.nn.utils.clip_grad_norm_(model.encoder.parameters(), max_norm=1)
-                dec_grad_norm = torch.nn.utils.clip_grad_norm_(model.decoder.parameters(), max_norm=1)
+                enc_grad_norm = torch.nn.utils.clip_grad_norm_(
+                    model.encoder.parameters(), max_norm=1
+                )
+                dec_grad_norm = torch.nn.utils.clip_grad_norm_(
+                    model.decoder.parameters(), max_norm=1
+                )
                 optimizer.step()
 
-                logger.add_scalar('training/duration_loss', dur_loss.item(), global_step=iteration)
-                logger.add_scalar('training/prior_loss', prior_loss.item(), global_step=iteration)
-                logger.add_scalar('training/diffusion_loss', diff_loss.item(), global_step=iteration)
-                logger.add_scalar('training/encoder_grad_norm', enc_grad_norm, global_step=iteration)
-                logger.add_scalar('training/decoder_grad_norm', dec_grad_norm, global_step=iteration)
-                
+                logger.add_scalar(
+                    "training/duration_loss", dur_loss.item(), global_step=iteration
+                )
+                logger.add_scalar(
+                    "training/prior_loss", prior_loss.item(), global_step=iteration
+                )
+                logger.add_scalar(
+                    "training/diffusion_loss", diff_loss.item(), global_step=iteration
+                )
+                logger.add_scalar(
+                    "training/encoder_grad_norm", enc_grad_norm, global_step=iteration
+                )
+                logger.add_scalar(
+                    "training/decoder_grad_norm", dec_grad_norm, global_step=iteration
+                )
+
                 dur_losses.append(dur_loss.item())
                 prior_losses.append(prior_loss.item())
                 diff_losses.append(diff_loss.item())
-                
+
                 if batch_idx % 5 == 0:
-                    msg = f'Epoch: {epoch}, iteration: {iteration} | dur_loss: {dur_loss.item()}, prior_loss: {prior_loss.item()}, diff_loss: {diff_loss.item()}'
+                    msg = f"Epoch: {epoch}, iteration: {iteration} | dur_loss: {dur_loss.item()}, prior_loss: {prior_loss.item()}, diff_loss: {diff_loss.item()}"
                     progress_bar.set_description(msg)
-                
+
                 iteration += 1
 
-        scheduler.step(np.mean(dur_losses) + np.mean(prior_losses) + np.mean(diff_losses)) # Reduce learning rate if loss does not improve
+            # Reduce learning rate if loss does not improve
+            scheduler.step(
+                np.mean(dur_losses) + np.mean(prior_losses) + np.mean(diff_losses)
+            )
+            msg = f"Epoch: {epoch}, iteration: {iteration} | dur_loss: {np.mean(dur_losses).item()}, prior_loss: {np.mean(prior_losses).item()}, diff_loss: {np.mean(diff_losses).item()}"
+            progress_bar.set_description(msg)
 
-        log_msg = 'Epoch %d: duration loss = %.3f ' % (epoch, np.mean(dur_losses))
-        log_msg += '| prior loss = %.3f ' % np.mean(prior_losses)
-        log_msg += '| diffusion loss = %.3f\n' % np.mean(diff_losses)
-        with open(f'{log_dir}/train.log', 'a') as f:
+        log_msg = "Epoch %d: duration loss = %.3f " % (
+            epoch,
+            np.mean(dur_losses).item(),
+        )
+        log_msg += "| prior loss = %.3f " % np.mean(prior_losses).item()
+        log_msg += "| diffusion loss = %.3f\n" % np.mean(diff_losses).item()
+        with open(f"{log_dir}/train.log", "a") as f:
             f.write(log_msg)
 
         if epoch % params.save_every > 0:
             continue
 
         model.eval()
-        print('Synthesis...')
+        print("Synthesis...")
         with torch.no_grad():
             for i, item in enumerate(test_batch):
-                x = item['x'].to(torch.long).unsqueeze(0).cuda()
+                x = item["x"].to(torch.long).unsqueeze(0).cuda()
                 x_lengths = torch.LongTensor([x.shape[-1]]).cuda()
                 y_enc, y_dec, attn = model(x, x_lengths, n_timesteps=50)
-                logger.add_image(f'image_{i}/generated_enc',
-                                 plot_tensor(y_enc.squeeze().cpu()),
-                                 global_step=iteration, dataformats='HWC')
-                logger.add_image(f'image_{i}/generated_dec',
-                                 plot_tensor(y_dec.squeeze().cpu()),
-                                 global_step=iteration, dataformats='HWC')
-                logger.add_image(f'image_{i}/alignment',
-                                 plot_tensor(attn.squeeze().cpu()),
-                                 global_step=iteration, dataformats='HWC')
-                save_plot(y_enc.squeeze().cpu(), 
-                          f'{log_dir}/generated_enc_{i}.png')
-                save_plot(y_dec.squeeze().cpu(), 
-                          f'{log_dir}/generated_dec_{i}.png')
-                save_plot(attn.squeeze().cpu(), 
-                          f'{log_dir}/alignment_{i}.png')
+                logger.add_image(
+                    f"image_{i}/generated_enc",
+                    plot_tensor(y_enc.squeeze().cpu()),
+                    global_step=iteration,
+                    dataformats="HWC",
+                )
+                logger.add_image(
+                    f"image_{i}/generated_dec",
+                    plot_tensor(y_dec.squeeze().cpu()),
+                    global_step=iteration,
+                    dataformats="HWC",
+                )
+                logger.add_image(
+                    f"image_{i}/alignment",
+                    plot_tensor(attn.squeeze().cpu()),
+                    global_step=iteration,
+                    dataformats="HWC",
+                )
+                save_plot(y_enc.squeeze().cpu(), f"{log_dir}/generated_enc_{i}.png")
+                save_plot(y_dec.squeeze().cpu(), f"{log_dir}/generated_dec_{i}.png")
+                save_plot(attn.squeeze().cpu(), f"{log_dir}/alignment_{i}.png")
 
         ckpt = model.state_dict()
         torch.save(ckpt, f=f"{log_dir}/grad_{epoch}.pt")
