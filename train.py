@@ -147,7 +147,7 @@ if __name__ == "__main__":
         dur_losses = []
         prior_losses = []
         diff_losses = []
-        with tqdm(loader, total=len(train_dataset) // batch_size) as progress_bar:
+        with tqdm(loader, total=len(train_dataset) // batch_size, leave=False) as progress_bar:
             for batch_idx, batch in enumerate(progress_bar):
                 model.zero_grad()
                 x, x_lengths = batch["x"].cuda(), batch["x_lengths"].cuda()
@@ -179,17 +179,14 @@ if __name__ == "__main__":
 
                 iteration += 1
 
-            mean_dur_loss = np.mean(dur_losses).item()
-            mean_prior_loss = np.mean(prior_losses).item()
-            mean_diff_loss = np.mean(diff_losses).item()
-
-            log_msg = f"Epoch {epoch}, iteration: {iteration} | duration loss = {mean_dur_loss}, prior loss = {mean_prior_loss}, diffusion loss = {mean_diff_loss}"
-            progress_bar.set_description(desc=log_msg)
-            progress_bar.refresh()
+        mean_dur_loss = np.mean(dur_losses).item()
+        mean_prior_loss = np.mean(prior_losses).item()
+        mean_diff_loss = np.mean(diff_losses).item()
 
         # Reduce learning rate if loss does not improve
         scheduler.step(mean_dur_loss + mean_prior_loss + mean_diff_loss)
 
+        log_msg = f"Epoch: {epoch}, iteration: {iteration} | duration loss = {mean_dur_loss}, prior loss = {mean_prior_loss}, diffusion loss = {mean_diff_loss}"
         print(log_msg)
         with open(f"{log_dir}/train.log", "a") as f:
             f.write(log_msg + "\n")
