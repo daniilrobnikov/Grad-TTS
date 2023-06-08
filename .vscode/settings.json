@@ -5,6 +5,7 @@
     "python.formatting.provider": "black",
     "python.formatting.blackArgs": [
         "--line-length=240",
+        "--skip-string-normalization",
     ],
     "editor.formatOnSave": true
 }
