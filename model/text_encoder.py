@@ -7,7 +7,7 @@ import torch
 from model.base import BaseModule
 from model.utils import sequence_mask, convert_pad_shape
 
-from scaling import (
+from model.scaling import (
     ActivationBalancer,
     BasicNorm,
     DoubleSwish,
