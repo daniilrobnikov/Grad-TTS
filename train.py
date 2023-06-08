@@ -118,10 +118,7 @@ if __name__ == "__main__":
         beta_max,
         pe_scale,
     ).cuda()
-    print(
-        "Number of encoder + duration predictor parameters: %.2fm"
-        % (model.encoder.nparams / 1e6)
-    )
+    print("Number of encoder + duration predictor parameters: %.2fm" % (model.encoder.nparams / 1e6))
     print("Number of decoder parameters: %.2fm" % (model.decoder.nparams / 1e6))
     print("Total parameters: %.2fm" % (model.nparams / 1e6))
     print("Number of epochs: %d" % n_epochs)
@@ -129,9 +126,7 @@ if __name__ == "__main__":
     print("Initializing optimizer...")
     # Change to AdamW optimizer (default: Adam)
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.5, patience=5, verbose=True
-    )
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=5, verbose=True)
 
     print("Logging test batch...")
     test_batch = test_dataset.sample_test_batch(size=params.test_size)
@@ -159,57 +154,41 @@ if __name__ == "__main__":
                 y, y_lengths = batch["y"].cuda(), batch["y_lengths"].cuda()
 
                 with torch.cuda.amp.autocast():  # Enable mixed-precision training
-                    dur_loss, prior_loss, diff_loss = model.compute_loss(
-                        x, x_lengths, y, y_lengths, out_size=out_size
-                    )
+                    dur_loss, prior_loss, diff_loss = model.compute_loss(x, x_lengths, y, y_lengths, out_size=out_size)
 
                     loss = sum([dur_loss, prior_loss, diff_loss])
                 loss.backward()
 
-                enc_grad_norm = torch.nn.utils.clip_grad_norm_(
-                    model.encoder.parameters(), max_norm=1
-                )
-                dec_grad_norm = torch.nn.utils.clip_grad_norm_(
-                    model.decoder.parameters(), max_norm=1
-                )
+                enc_grad_norm = torch.nn.utils.clip_grad_norm_(model.encoder.parameters(), max_norm=1)
+                dec_grad_norm = torch.nn.utils.clip_grad_norm_(model.decoder.parameters(), max_norm=1)
                 optimizer.step()
 
-                logger.add_scalar(
-                    "training/duration_loss", dur_loss.item(), global_step=iteration
-                )
-                logger.add_scalar(
-                    "training/prior_loss", prior_loss.item(), global_step=iteration
-                )
-                logger.add_scalar(
-                    "training/diffusion_loss", diff_loss.item(), global_step=iteration
-                )
-                logger.add_scalar(
-                    "training/encoder_grad_norm", enc_grad_norm, global_step=iteration
-                )
-                logger.add_scalar(
-                    "training/decoder_grad_norm", dec_grad_norm, global_step=iteration
-                )
+                logger.add_scalar("training/duration_loss", dur_loss.item(), global_step=iteration)
+                logger.add_scalar("training/prior_loss", prior_loss.item(), global_step=iteration)
+                logger.add_scalar("training/diffusion_loss", diff_loss.item(), global_step=iteration)
+                logger.add_scalar("training/encoder_grad_norm", enc_grad_norm, global_step=iteration)
+                logger.add_scalar("training/decoder_grad_norm", dec_grad_norm, global_step=iteration)
 
                 dur_losses.append(dur_loss.item())
                 prior_losses.append(prior_loss.item())
                 diff_losses.append(diff_loss.item())
 
-                if batch_idx % 5 == 0:
+                if batch_idx % 10 == 0:
                     msg = f"Epoch: {epoch}, iteration: {iteration} | dur_loss: {dur_loss.item()}, prior_loss: {prior_loss.item()}, diff_loss: {diff_loss.item()}"
                     progress_bar.set_description(desc=msg)
 
                 iteration += 1
 
-            # Reduce learning rate if loss does not improve
-            scheduler.step(
-                np.mean(dur_losses) + np.mean(prior_losses) + np.mean(diff_losses)
-            )
-            msg = f"Epoch: {epoch}, iteration: {iteration} | dur_loss: {np.mean(dur_losses).item()}, prior_loss: {np.mean(prior_losses).item()}, diff_loss: {np.mean(diff_losses).item()}"
-            progress_bar.set_description(desc=msg)
+        mean_dur_loss = np.mean(dur_losses).item()
+        mean_prior_loss = np.mean(prior_losses).item()
+        mean_diff_loss = np.mean(diff_losses).item()
+        # Reduce learning rate if loss does not improve
+        scheduler.step(mean_dur_loss + mean_prior_loss + mean_diff_loss)
 
-        log_msg = f"Epoch {epoch}: duration loss = {np.mean(dur_losses).item()} | prior loss = {np.mean(prior_losses).item()} | diffusion loss = {np.mean(diff_losses).item()}\n"
+        log_msg = f"Epoch {epoch}: duration loss = {mean_dur_loss} | prior loss = {mean_prior_loss} | diffusion loss = {mean_diff_loss}"
+        print(log_msg)
         with open(f"{log_dir}/train.log", "a") as f:
-            f.write(log_msg)
+            f.write(log_msg + "\n")
 
         if epoch % params.save_every > 0:
             continue
