@@ -98,6 +98,7 @@ class LinearAttention(BaseModule):
         q, k, v = rearrange(qkv, 'b (qkv heads c) h w -> qkv b heads c (h w)', heads=self.heads, qkv=3)
 
         q = q * self.scale  # scaling the queries
+        k = k * self.scale  # scaling the keys
         print(torch.isnan(q).any(), torch.isinf(q).any(), q.max(), q.min())
         dots = torch.einsum('bhid,bhjd->bhij', q, k)  # calculating dot product
         print(torch.isnan(dots).any(), torch.isinf(dots).any(), dots.max(), dots.min())
