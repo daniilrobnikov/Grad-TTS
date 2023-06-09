@@ -94,10 +94,13 @@ class LinearAttention(BaseModule):
     def forward(self, x):
         b, c, h, w = x.shape
         qkv = self.to_qkv(x)
+        print(torch.isnan(qkv).any(), torch.isinf(qkv).any())
         q, k, v = rearrange(qkv, 'b (qkv heads c) h w -> qkv b heads c (h w)', heads=self.heads, qkv=3)
 
         q = q * self.scale  # scaling the queries
+        print(torch.isnan(q).any(), torch.isinf(q).any(), q.max(), q.min())
         dots = torch.einsum('bhid,bhjd->bhij', q, k)  # calculating dot product
+        print(torch.isnan(dots).any(), torch.isinf(dots).any(), dots.max(), dots.min())
 
         attn = self.stable_softmax(dots)  # softmax to get probabilities using log-sum-exp trick
 
