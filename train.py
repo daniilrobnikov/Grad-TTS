@@ -132,7 +132,7 @@ if __name__ == "__main__":
     print("Initializing optimizer...")
     # Change to AdamW optimizer (default: Adam)
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=5, verbose=True)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=100, T_mult=2, eta_min=1e-6)
 
     print("Logging test batch...")
     test_batch = test_dataset.sample_test_batch(size=params.test_size)
@@ -169,8 +169,8 @@ if __name__ == "__main__":
                     loss = sum([dur_loss, prior_loss, diff_loss])
                 accelerator.backward(loss)
 
-                enc_grad_norm = accelerator.clip_grad_norm_(model.encoder.parameters(), max_norm=1)
-                dec_grad_norm = accelerator.clip_grad_norm_(model.decoder.parameters(), max_norm=1)
+                enc_grad_norm = torch.nn.utils.clip_grad_norm_(model.encoder.parameters(), max_norm=1)
+                dec_grad_norm = torch.nn.utils.clip_grad_norm_(model.decoder.parameters(), max_norm=1)
                 optimizer.step()
 
                 logger.add_scalar("training/duration_loss", dur_loss.item(), global_step=iteration)
