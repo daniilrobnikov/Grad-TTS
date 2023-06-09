@@ -17,7 +17,6 @@ from text import text_to_sequence, cmudict
 from text.symbols import symbols
 from utils import parse_filelist, intersperse
 from model.utils import fix_len_compatibility
-from params import seed as random_seed
 
 import sys
 
@@ -49,7 +48,6 @@ class TextMelDataset(torch.utils.data.Dataset):
         self.win_length = win_length
         self.f_min = f_min
         self.f_max = f_max
-        random.seed(random_seed)
         random.shuffle(self.filepaths_and_text)
 
     def get_pair(self, filepath_and_text):
@@ -77,9 +75,7 @@ class TextMelDataset(torch.utils.data.Dataset):
     def get_text(self, text, add_blank=True):
         text_norm = text_to_sequence(text, dictionary=self.cmudict)
         if self.add_blank:
-            text_norm = intersperse(
-                text_norm, len(symbols)
-            )  # add a blank token, whose id number is len(symbols)
+            text_norm = intersperse(text_norm, len(symbols))  # add a blank token, whose id number is len(symbols)
         text_norm = torch.IntTensor(text_norm)
         return text_norm
 
@@ -148,7 +144,6 @@ class TextMelSpeakerDataset(torch.utils.data.Dataset):
         self.f_min = f_min
         self.f_max = f_max
         self.add_blank = add_blank
-        random.seed(random_seed)
         random.shuffle(self.filelist)
 
     def get_triplet(self, line):
@@ -177,9 +172,7 @@ class TextMelSpeakerDataset(torch.utils.data.Dataset):
     def get_text(self, text, add_blank=True):
         text_norm = text_to_sequence(text, dictionary=self.cmudict)
         if self.add_blank:
-            text_norm = intersperse(
-                text_norm, len(symbols)
-            )  # add a blank token, whose id number is len(symbols)
+            text_norm = intersperse(text_norm, len(symbols))  # add a blank token, whose id number is len(symbols)
         text_norm = torch.LongTensor(text_norm)
         return text_norm
 

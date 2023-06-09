@@ -13,7 +13,9 @@ import torch
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from accelerate import Accelerator, DistributedType
+from accelerate import Accelerator, DistributedType, DistributedDataParallelKwargs
+from accelerate.utils import set_seed
+
 from model import GradTTS
 from data import TextMelDataset, TextMelBatchCollate
 from utils import plot_tensor, save_plot
@@ -58,12 +60,11 @@ pe_scale = params.pe_scale
 
 
 if __name__ == "__main__":
-    torch.manual_seed(random_seed)
-    torch.backends.cudnn.benchmark = True  # Enable CUDA optimization
-    np.random.seed(random_seed)
+    set_seed(random_seed)
 
     print("Initializing accelerator...")
-    accelerator = Accelerator()
+    ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
+    accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
     device = accelerator.device  # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     print("Initializing logger...")
@@ -162,14 +163,14 @@ if __name__ == "__main__":
                 # x, x_lengths = batch["x"].to(device), batch["x_lengths"].to(device)
                 # y, y_lengths = batch["y"].to(device), batch["y_lengths"].to(device)
 
-                with torch.cuda.amp.autocast():  # Enable mixed-precision training
+                with accelerator.autocast():  # Enable mixed-precision training
                     dur_loss, prior_loss, diff_loss = model.compute_loss(x, x_lengths, y, y_lengths, out_size=out_size)
 
                     loss = sum([dur_loss, prior_loss, diff_loss])
                 accelerator.backward(loss)
 
-                enc_grad_norm = torch.nn.utils.clip_grad_norm_(model.encoder.parameters(), max_norm=1)
-                dec_grad_norm = torch.nn.utils.clip_grad_norm_(model.decoder.parameters(), max_norm=1)
+                enc_grad_norm = accelerator.clip_grad_norm_(model.encoder.parameters(), max_norm=1)
+                dec_grad_norm = accelerator.clip_grad_norm_(model.decoder.parameters(), max_norm=1)
                 optimizer.step()
 
                 logger.add_scalar("training/duration_loss", dur_loss.item(), global_step=iteration)
@@ -183,10 +184,7 @@ if __name__ == "__main__":
                 diff_losses.append(diff_loss.item())
 
                 if batch_idx % 10 == 0:
-                    msg = (
-                        f"Epoch: {epoch:5d}, iteration: {iteration:7d} | dur_loss: {dur_loss.item()}, prior_loss:"
-                        f" {prior_loss.item()}, diff_loss: {diff_loss.item()}"
-                    )
+                    msg = f"Epoch: {epoch:5d}, iteration: {iteration:7d} | dur_loss: {dur_loss.item()}, prior_loss: {prior_loss.item()}, diff_loss: {diff_loss.item()}"
                     progress_bar.set_description(desc=msg)
 
                 iteration += 1
@@ -194,10 +192,7 @@ if __name__ == "__main__":
         mean_dur_loss = np.mean(dur_losses).item()
         mean_prior_loss = np.mean(prior_losses).item()
         mean_diff_loss = np.mean(diff_losses).item()
-        log_msg = (
-            f"Epoch: {epoch:5d}, iteration: {iteration:7d} | dur_loss: {mean_dur_loss}, prior_loss: {mean_prior_loss},"
-            f" diff_loss: {mean_diff_loss}"
-        )
+        log_msg = f"Epoch: {epoch:5d}, iteration: {iteration:7d} | dur_loss: {mean_dur_loss}, prior_loss: {mean_prior_loss}, diff_loss: {mean_diff_loss}"
         print(log_msg)
         with open(f"{log_dir}/train.log", "a") as f:
             f.write(log_msg + "\n")
@@ -238,4 +233,4 @@ if __name__ == "__main__":
                 save_plot(attn.squeeze().cpu(), f"{log_dir}/alignment_{i}.png")
 
         ckpt = model.state_dict()
-        torch.save(ckpt, f=f"{log_dir}/grad_{epoch}.pt")
+        accelerator.save(ckpt, f=f"{log_dir}/grad_{epoch}.pt")
