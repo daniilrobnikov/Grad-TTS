@@ -92,6 +92,22 @@ class LinearAttention(BaseModule):
         qkv = self.to_qkv(x)
         q, k, v = rearrange(qkv, 'b (qkv heads c) h w -> qkv b heads c (h w)', heads=self.heads, qkv=3)
 
+        q = q * self.scale
+        dots = torch.einsum('bhid,bhjd->bhij', q, k)
+
+        # Apply log-sum-exp trick to the softmax function
+        max_logits = torch.max(dots, dim=-1, keepdim=True)[0]
+        dots = dots - max_logits  # max subtraction for numerical stability
+        exp_dots = torch.exp(dots)  # exponentiate
+        sum_exp_dots = torch.sum(exp_dots, dim=-1, keepdim=True)
+        log_sum_exp_dots = torch.log(sum_exp_dots)  # apply log to the sum of exp
+        attn = exp_dots - log_sum_exp_dots  # subtract log-sum-exp from exponentiated dots, softmax operation
+
+        out = torch.einsum('bhij,bhjd->bhid', attn.exp(), v)  # exponentiate again before taking the weighted sum
+        out = rearrange(out, 'b heads c (h w) -> b (heads c) h w', heads=self.heads, h=h, w=w)
+
+        return self.to_out(out)
+
         k = k.softmax(dim=-1)
         context = torch.einsum('bhdn,bhen->bhde', k, v)
         out = torch.einsum('bhde,bhdn->bhen', context, q)
@@ -123,12 +139,6 @@ class LinearAttention(BaseModule):
         out = rearrange(out, 'b heads c (h w) -> b (heads c) h w', h=h, w=w)
         out = self.to_out(out)
         return out
-
-        k = k.softmax(dim=-1)
-        context = torch.einsum('bhdn,bhen->bhde', k, v)
-        out = torch.einsum('bhde,bhdn->bhen', context, q)
-        out = rearrange(out, 'b heads c (h w) -> b (heads c) h w', heads=self.heads, h=h, w=w)
-        return self.to_out(out)
 
         dots = torch.einsum('bhid,bhjd->bhij', q, k) * (c**-0.5)
         attn = dots.softmax(dim=-1)
