@@ -95,6 +95,7 @@ class LinearAttention(BaseModule):
         out = torch.einsum('bhij,bhjd->bhid', attn, v)
         out = rearrange(out, 'b heads c (h w) -> b (heads c) h w', heads=self.heads, h=h, w=w)
         out = self.to_out(out)
+        return out
 
 
 class Residual(BaseModule):
