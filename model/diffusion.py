@@ -95,6 +95,8 @@ class LinearAttention(BaseModule):
         q = q * self.scale  # scaling the queries
         dots = torch.einsum('bhid,bhjd->bhij', q, k)  # calculating dot product
 
+        dots = dots - dots.max(dim=-1, keepdim=True).values  # subtract max for stability
+
         attn = dots.softmax(dim=-1)  # softmax to get probabilities
         out = torch.einsum('bhij,bhjd->bhid', attn, v)  # calculate weighted sum of values
         out = rearrange(
