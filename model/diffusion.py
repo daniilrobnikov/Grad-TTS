@@ -87,24 +87,24 @@ class LinearAttention(BaseModule):
         self.to_qkv = torch.nn.Conv2d(dim, hidden_dim * 3, 1, bias=False)
         self.to_out = torch.nn.Conv2d(hidden_dim, dim, 1)
 
+    def stable_softmax(self, logits):
+        e_x = torch.exp(logits - torch.max(logits, dim=-1, keepdim=True).values)
+        return e_x / e_x.sum(dim=-1, keepdim=True)
+
     def forward(self, x):
         b, c, h, w = x.shape
         qkv = self.to_qkv(x)
         q, k, v = rearrange(qkv, 'b (qkv heads c) h w -> qkv b heads c (h w)', heads=self.heads, qkv=3)
 
-        q = q * self.scale
-        dots = torch.einsum('bhid,bhjd->bhij', q, k)
+        q = q * self.scale  # scaling the queries
+        dots = torch.einsum('bhid,bhjd->bhij', q, k)  # calculating dot product
 
-        # Apply log-sum-exp trick to the softmax function
-        max_logits = torch.max(dots, dim=-1, keepdim=True)[0]
-        dots = dots - max_logits  # max subtraction for numerical stability
-        exp_dots = torch.exp(dots)  # exponentiate
-        sum_exp_dots = torch.sum(exp_dots, dim=-1, keepdim=True)
-        log_sum_exp_dots = torch.log(sum_exp_dots)  # apply log to the sum of exp
-        attn = exp_dots - log_sum_exp_dots  # subtract log-sum-exp from exponentiated dots, softmax operation
+        attn = self.stable_softmax(dots)  # softmax to get probabilities using log-sum-exp trick
 
-        out = torch.einsum('bhij,bhjd->bhid', attn.exp(), v)  # exponentiate again before taking the weighted sum
-        out = rearrange(out, 'b heads c (h w) -> b (heads c) h w', heads=self.heads, h=h, w=w)
+        out = torch.einsum('bhij,bhjd->bhid', attn, v)  # calculate weighted sum of values
+        out = rearrange(
+            out, 'b heads c (h w) -> b (heads c) h w', heads=self.heads, h=h, w=w
+        )  # reshape to original shape
 
         return self.to_out(out)
 
