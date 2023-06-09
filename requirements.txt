@@ -8,3 +8,4 @@ Unidecode
 librosa
 scipy
 tqdm
+accelerate

@@ -92,8 +92,8 @@ class LinearAttention(BaseModule):
         qkv = self.to_qkv(x)
         q, k, v = rearrange(qkv, 'b (qkv heads c) h w -> qkv b heads c (h w)', heads=self.heads, qkv=3)
 
-        q *= self.scale
-        k *= self.scale
+        q = q * self.scale  # scale query
+        k = k * self.scale  # scale key
         dots = torch.einsum('bhid,bhjd->bhij', q, k)  # calculating dot product
         attn = dots.softmax(dim=-1)  # softmax to get probabilities
 
