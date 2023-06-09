@@ -82,6 +82,7 @@ class LinearAttention(BaseModule):
     def __init__(self, dim, heads=4, dim_head=32):
         super(LinearAttention, self).__init__()
         self.heads = heads
+        self.scale = dim_head**-0.5
         hidden_dim = dim_head * heads
         self.to_qkv = torch.nn.Conv2d(dim, hidden_dim * 3, 1, bias=False)
         self.to_out = torch.nn.Conv2d(hidden_dim, dim, 1)
@@ -90,6 +91,18 @@ class LinearAttention(BaseModule):
         b, c, h, w = x.shape
         qkv = self.to_qkv(x)
         q, k, v = rearrange(qkv, 'b (qkv heads c) h w -> qkv b heads c (h w)', heads=self.heads, qkv=3)
+
+        q = q * self.scale  # scaling the queries
+        dots = torch.einsum('bhid,bhjd->bhij', q, k)  # calculating dot product
+
+        attn = dots.softmax(dim=-1)  # softmax to get probabilities
+        out = torch.einsum('bhij,bhjd->bhid', attn, v)  # calculate weighted sum of values
+        out = rearrange(
+            out, 'b heads c (h w) -> b (heads c) h w', heads=self.heads, h=h, w=w
+        )  # reshape to original shape
+
+        return self.to_out(out)
+
         dots = torch.einsum('bhid,bhjd->bhij', q, k) * (c**-0.5)
         attn = dots.softmax(dim=-1)
         out = torch.einsum('bhij,bhjd->bhid', attn, v)
