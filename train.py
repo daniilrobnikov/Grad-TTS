@@ -173,7 +173,7 @@ if __name__ == "__main__":
                 prior_losses.append(prior_loss.item())
                 diff_losses.append(diff_loss.item())
 
-                if batch_idx % 20 == 0:
+                if batch_idx % 10 == 0:
                     msg = f"Epoch: {epoch:5d}, iteration: {iteration:7d} | dur_loss: {dur_loss.item()}, prior_loss: {prior_loss.item()}, diff_loss: {diff_loss.item()}"
                     progress_bar.set_description(desc=msg)
 
@@ -182,14 +182,13 @@ if __name__ == "__main__":
         mean_dur_loss = np.mean(dur_losses).item()
         mean_prior_loss = np.mean(prior_losses).item()
         mean_diff_loss = np.mean(diff_losses).item()
-
-        # Reduce learning rate if loss does not improve
-        scheduler.step(mean_dur_loss + mean_prior_loss + mean_diff_loss)
-
         log_msg = f"Epoch: {epoch:5d}, iteration: {iteration:7d} | dur_loss: {mean_dur_loss}, prior_loss: {mean_prior_loss}, diff_loss: {mean_diff_loss}"
         print(log_msg)
         with open(f"{log_dir}/train.log", "a") as f:
             f.write(log_msg + "\n")
+
+        # Reduce learning rate if loss does not improve
+        scheduler.step(mean_dur_loss + mean_prior_loss + mean_diff_loss)
 
         if epoch % params.save_every > 0:
             continue

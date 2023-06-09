@@ -60,11 +60,7 @@ class ConvSwishNorm(BaseModule):
 
         self.conv_layers = torch.nn.ModuleList()
         self.norm_layers = torch.nn.ModuleList()
-        self.conv_layers.append(
-            torch.nn.Conv1d(
-                in_channels, hidden_channels, kernel_size, padding=kernel_size // 2
-            )
-        )
+        self.conv_layers.append(torch.nn.Conv1d(in_channels, hidden_channels, kernel_size, padding=kernel_size // 2))
         self.norm_layers.append(LayerNorm(hidden_channels))
         self.activation_drop = torch.nn.Sequential(
             ActivationBalancer(hidden_channels, channel_dim=1),
@@ -105,13 +101,9 @@ class DurationPredictor(BaseModule):
         self.balancer = ActivationBalancer(filter_channels, channel_dim=1)
         self.activation = DoubleSwish()
         self.drop = torch.nn.Dropout(p_dropout)
-        self.conv_1 = torch.nn.Conv1d(
-            in_channels, filter_channels, kernel_size, padding=kernel_size // 2
-        )
+        self.conv_1 = torch.nn.Conv1d(in_channels, filter_channels, kernel_size, padding=kernel_size // 2)
         self.norm_1 = LayerNorm(filter_channels)
-        self.conv_2 = torch.nn.Conv1d(
-            filter_channels, filter_channels, kernel_size, padding=kernel_size // 2
-        )
+        self.conv_2 = torch.nn.Conv1d(filter_channels, filter_channels, kernel_size, padding=kernel_size // 2)
         self.norm_2 = LayerNorm(filter_channels)
         self.proj = torch.nn.Conv1d(filter_channels, 1, 1)
 
@@ -161,23 +153,17 @@ class MultiHeadAttention(BaseModule):
         if window_size is not None:
             n_heads_rel = 1 if heads_share else n_heads
             rel_stddev = self.k_channels**-0.5
-            self.emb_rel_k = torch.nn.Parameter(
-                torch.randn(n_heads_rel, window_size * 2 + 1, self.k_channels)
-                * rel_stddev
-            )
-            self.emb_rel_v = torch.nn.Parameter(
-                torch.randn(n_heads_rel, window_size * 2 + 1, self.k_channels)
-                * rel_stddev
-            )
+            self.emb_rel_k = torch.nn.Parameter(torch.randn(n_heads_rel, window_size * 2 + 1, self.k_channels) * rel_stddev)
+            self.emb_rel_v = torch.nn.Parameter(torch.randn(n_heads_rel, window_size * 2 + 1, self.k_channels) * rel_stddev)
         self.conv_o = torch.nn.Conv1d(channels, out_channels, 1)
         self.drop = torch.nn.Dropout(p_dropout)
 
         torch.nn.init.xavier_uniform_(self.conv_q.weight)
         torch.nn.init.xavier_uniform_(self.conv_k.weight)
+        torch.nn.init.xavier_uniform_(self.conv_v.weight)
         if proximal_init:
             self.conv_k.weight.data.copy_(self.conv_q.weight.data)
             self.conv_k.bias.data.copy_(self.conv_q.bias.data)
-        torch.nn.init.xavier_uniform_(self.conv_v.weight)
 
     def forward(self, x, c, attn_mask=None):
         q = self.conv_q(x)
@@ -197,9 +183,7 @@ class MultiHeadAttention(BaseModule):
 
         scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(self.k_channels)
         if self.window_size is not None:
-            assert (
-                t_s == t_t
-            ), "Relative attention is only available for self-attention."
+            assert t_s == t_t, "Relative attention is only available for self-attention."
             key_relative_embeddings = self._get_relative_embeddings(self.emb_rel_k, t_s)
             rel_logits = self._matmul_with_relative_keys(query, key_relative_embeddings)
             rel_logits = self._relative_position_to_absolute_position(rel_logits)
@@ -207,9 +191,7 @@ class MultiHeadAttention(BaseModule):
             scores = scores + scores_local
         if self.proximal_bias:
             assert t_s == t_t, "Proximal bias is only available for self-attention."
-            scores = scores + self._attention_bias_proximal(t_s).to(
-                device=scores.device, dtype=scores.dtype
-            )
+            scores = scores + self._attention_bias_proximal(t_s).to(device=scores.device, dtype=scores.dtype)
         if mask is not None:
             scores = scores.masked_fill(mask == 0, -1e4)
         p_attn = torch.nn.functional.softmax(scores, dim=-1)
@@ -217,12 +199,8 @@ class MultiHeadAttention(BaseModule):
         output = torch.matmul(p_attn, value)
         if self.window_size is not None:
             relative_weights = self._absolute_position_to_relative_position(p_attn)
-            value_relative_embeddings = self._get_relative_embeddings(
-                self.emb_rel_v, t_s
-            )
-            output = output + self._matmul_with_relative_values(
-                relative_weights, value_relative_embeddings
-            )
+            value_relative_embeddings = self._get_relative_embeddings(self.emb_rel_v, t_s)
+            output = output + self._matmul_with_relative_values(relative_weights, value_relative_embeddings)
         output = output.transpose(2, 3).contiguous().view(b, d, t_t)
         return output, p_attn
 
@@ -245,34 +223,22 @@ class MultiHeadAttention(BaseModule):
             )
         else:
             padded_relative_embeddings = relative_embeddings
-        used_relative_embeddings = padded_relative_embeddings[
-            :, slice_start_position:slice_end_position
-        ]
+        used_relative_embeddings = padded_relative_embeddings[:, slice_start_position:slice_end_position]
         return used_relative_embeddings
 
     def _relative_position_to_absolute_position(self, x):
         batch, heads, length, _ = x.size()
-        x = torch.nn.functional.pad(
-            x, convert_pad_shape([[0, 0], [0, 0], [0, 0], [0, 1]])
-        )
+        x = torch.nn.functional.pad(x, convert_pad_shape([[0, 0], [0, 0], [0, 0], [0, 1]]))
         x_flat = x.view([batch, heads, length * 2 * length])
-        x_flat = torch.nn.functional.pad(
-            x_flat, convert_pad_shape([[0, 0], [0, 0], [0, length - 1]])
-        )
-        x_final = x_flat.view([batch, heads, length + 1, 2 * length - 1])[
-            :, :, :length, length - 1 :
-        ]
+        x_flat = torch.nn.functional.pad(x_flat, convert_pad_shape([[0, 0], [0, 0], [0, length - 1]]))
+        x_final = x_flat.view([batch, heads, length + 1, 2 * length - 1])[:, :, :length, length - 1 :]
         return x_final
 
     def _absolute_position_to_relative_position(self, x):
         batch, heads, length, _ = x.size()
-        x = torch.nn.functional.pad(
-            x, convert_pad_shape([[0, 0], [0, 0], [0, 0], [0, length - 1]])
-        )
+        x = torch.nn.functional.pad(x, convert_pad_shape([[0, 0], [0, 0], [0, 0], [0, length - 1]]))
         x_flat = x.view([batch, heads, length**2 + length * (length - 1)])
-        x_flat = torch.nn.functional.pad(
-            x_flat, convert_pad_shape([[0, 0], [0, 0], [length, 0]])
-        )
+        x_flat = torch.nn.functional.pad(x_flat, convert_pad_shape([[0, 0], [0, 0], [length, 0]]))
         x_final = x_flat.view([batch, heads, length, 2 * length])[:, :, :, 1:]
         return x_final
 
@@ -283,9 +249,7 @@ class MultiHeadAttention(BaseModule):
 
 
 class FFN(BaseModule):
-    def __init__(
-        self, in_channels, out_channels, filter_channels, kernel_size, p_dropout=0.0
-    ):
+    def __init__(self, in_channels, out_channels, filter_channels, kernel_size, p_dropout=0.0):
         super(FFN, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -293,15 +257,14 @@ class FFN(BaseModule):
         self.kernel_size = kernel_size
         self.p_dropout = p_dropout
 
-        self.conv_1 = torch.nn.Conv1d(
-            in_channels, filter_channels, kernel_size, padding=kernel_size // 2
-        )
+        self.conv_1 = torch.nn.Conv1d(in_channels, filter_channels, kernel_size, padding=kernel_size // 2)
         self.balancer = ActivationBalancer(filter_channels, channel_dim=1)
         self.activation = DoubleSwish()
-        self.conv_2 = torch.nn.Conv1d(
-            filter_channels, out_channels, kernel_size, padding=kernel_size // 2
-        )
+        self.conv_2 = torch.nn.Conv1d(filter_channels, out_channels, kernel_size, padding=kernel_size // 2)
         self.drop = torch.nn.Dropout(p_dropout)
+
+        torch.nn.init.xavier_uniform_(self.conv_1.weight)
+        torch.nn.init.xavier_uniform_(self.conv_2.weight)
 
     def forward(self, x, x_mask):
         x = self.conv_1(x * x_mask)
@@ -313,17 +276,7 @@ class FFN(BaseModule):
 
 
 class Encoder(BaseModule):
-    def __init__(
-        self,
-        hidden_channels,
-        filter_channels,
-        n_heads,
-        n_layers,
-        kernel_size=1,
-        p_dropout=0.0,
-        window_size=None,
-        **kwargs
-    ):
+    def __init__(self, hidden_channels, filter_channels, n_heads, n_layers, kernel_size=1, p_dropout=0.0, window_size=None, **kwargs):
         super(Encoder, self).__init__()
         self.hidden_channels = hidden_channels
         self.filter_channels = filter_channels
@@ -359,7 +312,6 @@ class Encoder(BaseModule):
                 )
             )
             self.norm_layers_2.append(LayerNorm(hidden_channels))
-        # self.basic_norm = BasicNorm(hidden_channels, channel_dim=1)
 
     def forward(self, x, x_mask):
         attn_mask = x_mask.unsqueeze(2) * x_mask.unsqueeze(-1)
@@ -371,7 +323,6 @@ class Encoder(BaseModule):
             y = self.ffn_layers[i](x, x_mask)
             y = self.drop(y)
             x = self.norm_layers_2[i](x + y)
-        # x = self.basic_norm(x)
         x = x * x_mask
         return x
 
@@ -409,9 +360,7 @@ class TextEncoder(BaseModule):
         self.emb = torch.nn.Embedding(n_vocab, n_channels)
         torch.nn.init.normal_(self.emb.weight, 0.0, n_channels**-0.5)
 
-        self.prenet = ConvSwishNorm(
-            n_channels, n_channels, n_channels, kernel_size=5, n_layers=3, p_dropout=0.5
-        )
+        self.prenet = ConvSwishNorm(n_channels, n_channels, n_channels, kernel_size=5, n_layers=3, p_dropout=0.5)
 
         self.encoder = Encoder(
             n_channels + (spk_emb_dim if n_spks > 1 else 0),
@@ -423,9 +372,7 @@ class TextEncoder(BaseModule):
             window_size=window_size,
         )
 
-        self.proj_m = torch.nn.Conv1d(
-            n_channels + (spk_emb_dim if n_spks > 1 else 0), n_feats, 1
-        )
+        self.proj_m = torch.nn.Conv1d(n_channels + (spk_emb_dim if n_spks > 1 else 0), n_feats, 1)
         self.proj_w = DurationPredictor(
             n_channels + (spk_emb_dim if n_spks > 1 else 0),
             filter_channels_dp,
