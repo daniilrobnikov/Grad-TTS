@@ -90,20 +90,26 @@ class LinearAttention(BaseModule):
     def forward(self, x):
         b, c, h, w = x.shape
         qkv = self.to_qkv(x)
+        print("qkv shape:", qkv.shape)
         q, k, v = rearrange(qkv, 'b (qkv heads c) h w -> qkv b heads c (h w)', heads=self.heads, qkv=3)
+        print("q shape:", q.shape)
+        print("k shape:", k.shape)
+        print("v shape:", v.shape)
+        print("scale:", self.scale)
 
         q = q * self.scale  # scaling the queries
         dots = torch.einsum('bhid,bhjd->bhij', q, k)  # calculating dot product
+        print("dots shape:", dots.shape)
 
-        dots = dots - dots.max(dim=-1, keepdim=True).values  # subtract max for stability
-        dots = dots.exp()  # dot products softmax
+        attn = dots.softmax(dim=-1)  # softmax to get probabilities
+        print("attn shape:", attn.shape)
+        out = torch.einsum('bhij,bhjd->bhid', attn, v)  # calculate weighted sum of values
+        print("out shape:", out.shape)
+        out = rearrange(
+            out, 'b heads c (h w) -> b (heads c) h w', heads=self.heads, h=h, w=w
+        )  # reshape to original shape
 
-        attn = dots / dots.sum(dim=-1, keepdim=True)  # normalize
-
-        out = torch.einsum('bhij,bhjd->bhid', attn, v)  # weighted sum
-        out = rearrange(out, 'b heads c (h w) -> b (heads c) h w', heads=self.heads, h=h)
-        out = self.to_out(out)
-        return out
+        return self.to_out(out)
 
         attn = dots.softmax(dim=-1)  # softmax to get probabilities
         out = torch.einsum('bhij,bhjd->bhid', attn, v)  # calculate weighted sum of values
