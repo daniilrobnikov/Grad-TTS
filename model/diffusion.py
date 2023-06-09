@@ -90,6 +90,11 @@ class LinearAttention(BaseModule):
         b, c, h, w = x.shape
         qkv = self.to_qkv(x)
         q, k, v = rearrange(qkv, 'b (qkv heads c) h w -> qkv b heads c (h w)', heads=self.heads, qkv=3)
+        k = k.softmax(dim=-1)
+        context = torch.einsum('bhdn,bhen->bhde', k, v)
+        out = torch.einsum('bhde,bhdn->bhen', context, q)
+        out = rearrange(out, 'b heads c (h w) -> b (heads c) h w', heads=self.heads, h=h, w=w)
+        return self.to_out(out)
         dots = torch.einsum('bhid,bhjd->bhij', q, k) * (c**-0.5)
         attn = dots.softmax(dim=-1)
         out = torch.einsum('bhij,bhjd->bhid', attn, v)
