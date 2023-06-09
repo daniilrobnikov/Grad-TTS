@@ -153,8 +153,12 @@ class MultiHeadAttention(BaseModule):
         if window_size is not None:
             n_heads_rel = 1 if heads_share else n_heads
             rel_stddev = self.k_channels**-0.5
-            self.emb_rel_k = torch.nn.Parameter(torch.randn(n_heads_rel, window_size * 2 + 1, self.k_channels) * rel_stddev)
-            self.emb_rel_v = torch.nn.Parameter(torch.randn(n_heads_rel, window_size * 2 + 1, self.k_channels) * rel_stddev)
+            self.emb_rel_k = torch.nn.Parameter(
+                torch.randn(n_heads_rel, window_size * 2 + 1, self.k_channels) * rel_stddev
+            )
+            self.emb_rel_v = torch.nn.Parameter(
+                torch.randn(n_heads_rel, window_size * 2 + 1, self.k_channels) * rel_stddev
+            )
         self.conv_o = torch.nn.Conv1d(channels, out_channels, 1)
         self.drop = torch.nn.Dropout(p_dropout)
 
@@ -276,7 +280,17 @@ class FFN(BaseModule):
 
 
 class Encoder(BaseModule):
-    def __init__(self, hidden_channels, filter_channels, n_heads, n_layers, kernel_size=1, p_dropout=0.0, window_size=None, **kwargs):
+    def __init__(
+        self,
+        hidden_channels,
+        filter_channels,
+        n_heads,
+        n_layers,
+        kernel_size=1,
+        p_dropout=0.0,
+        window_size=None,
+        **kwargs
+    ):
         super(Encoder, self).__init__()
         self.hidden_channels = hidden_channels
         self.filter_channels = filter_channels
