@@ -87,10 +87,6 @@ class LinearAttention(BaseModule):
         self.to_qkv = torch.nn.Conv2d(dim, hidden_dim * 3, 1, bias=False)
         self.to_out = torch.nn.Conv2d(hidden_dim, dim, 1)
 
-    def stable_softmax(self, logits):
-        e_x = torch.exp(logits - torch.max(logits, dim=-1, keepdim=True).values)
-        return e_x / e_x.sum(dim=-1, keepdim=True)
-
     def forward(self, x):
         b, c, h, w = x.shape
         qkv = self.to_qkv(x)
@@ -99,11 +95,8 @@ class LinearAttention(BaseModule):
 
         q = q * self.scale  # scaling the queries
         k = k * self.scale  # scaling the keys
-        print(torch.isnan(q).any(), torch.isinf(q).any(), q.max(), q.min())
         dots = torch.einsum('bhid,bhjd->bhij', q, k)  # calculating dot product
-        print(torch.isnan(dots).any(), torch.isinf(dots).any(), dots.max(), dots.min())
-
-        attn = self.stable_softmax(dots)  # softmax to get probabilities using log-sum-exp trick
+        attn = dots.softmax(dim=-1)  # softmax to get probabilities
 
         out = torch.einsum('bhij,bhjd->bhid', attn, v)  # calculate weighted sum of values
         out = rearrange(
@@ -117,39 +110,6 @@ class LinearAttention(BaseModule):
         out = torch.einsum('bhde,bhdn->bhen', context, q)
         out = rearrange(out, 'b heads c (h w) -> b (heads c) h w', heads=self.heads, h=h, w=w)
         return self.to_out(out)
-
-        q = q * self.scale  # scaling the queries
-        dots = torch.einsum('bhid,bhjd->bhij', q, k)  # calculating dot product
-        dots = dots - dots.max()  # subtracting maximum for numerical stability
-        attn = dots.softmax(dim=-1)  # softmax to get probabilities
-        out = torch.einsum('bhij,bhjd->bhid', attn, v)  # calculate weighted sum of values
-        out = rearrange(
-            out, 'b heads c (h w) -> b (heads c) h w', heads=self.heads, h=h, w=w
-        )  # reshape to original shape
-
-        return self.to_out(out)
-
-        attn = dots.softmax(dim=-1)  # softmax to get probabilities
-        out = torch.einsum('bhij,bhjd->bhid', attn, v)  # calculate weighted sum of values
-        out = rearrange(
-            out, 'b heads c (h w) -> b (heads c) h w', heads=self.heads, h=h, w=w
-        )  # reshape to original shape
-
-        return self.to_out(out)
-
-        dots = torch.einsum('bhid,bhjd->bhij', q, k) * (c**-0.5)
-        attn = dots.softmax(dim=-1)
-        out = torch.einsum('bhij,bhjd->bhid', attn, v)
-        out = rearrange(out, 'b heads c (h w) -> b (heads c) h w', h=h, w=w)
-        out = self.to_out(out)
-        return out
-
-        dots = torch.einsum('bhid,bhjd->bhij', q, k) * (c**-0.5)
-        attn = dots.softmax(dim=-1)
-        out = torch.einsum('bhij,bhjd->bhid', attn, v)
-        out = rearrange(out, 'b heads c (h w) -> b (heads c) h w', heads=self.heads, h=h, w=w)
-        out = self.to_out(out)
-        return out
 
 
 class Residual(BaseModule):
