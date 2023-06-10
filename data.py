@@ -84,8 +84,10 @@ class TextMelDataset(torch.utils.data.Dataset):
         return mel
 
     def get_pitch(self, audio, sr):
-        _f0, t = pw.dio(audio, sr)  # raw pitch extractor
-        f0 = pw.stonemask(audio, _f0, t, sr)  # pitch refinement
+        audio_np = audio.numpy()[0]
+        audio_np = audio_np.astype(np.float64)
+        _f0, t = pw.dio(audio_np, sr)  # raw pitch extractor
+        f0 = pw.stonemask(audio_np, _f0, t, sr)  # pitch refinement
         return f0
 
     def __getitem__(self, index):
