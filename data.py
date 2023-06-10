@@ -129,7 +129,7 @@ class TextMelBatchCollate(object):
             x_lengths.append(x_.shape[-1])
             y[i, :, : y_.shape[-1]] = y_
             x[i, : x_.shape[-1]] = x_
-            y_pitch.append(y_pitch_)
+            y_pitch[i, : y_pitch_.shape[-1]] = y_pitch_
 
         y_lengths = torch.LongTensor(y_lengths)
         x_lengths = torch.LongTensor(x_lengths)
