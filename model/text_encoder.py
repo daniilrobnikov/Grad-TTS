@@ -122,6 +122,37 @@ class DurationPredictor(BaseModule):
         return x * x_mask
 
 
+# class PitchPredictor(BaseModule):
+#     def __init__(self, in_channels, filter_channels, kernel_size, p_dropout):
+#         super(PitchPredictor, self).__init__()
+#         self.in_channels = in_channels
+#         self.filter_channels = filter_channels
+#         self.p_dropout = p_dropout
+
+#         self.balancer = ActivationBalancer(filter_channels, channel_dim=1)
+#         self.activation = DoubleSwish()
+#         self.drop = torch.nn.Dropout(p_dropout)
+#         self.conv_1 = torch.nn.Conv1d(in_channels, filter_channels, kernel_size, padding=kernel_size // 2)
+#         self.norm_1 = LayerNorm(filter_channels)
+#         self.conv_2 = torch.nn.Conv1d(filter_channels, filter_channels, kernel_size, padding=kernel_size // 2)
+#         self.norm_2 = LayerNorm(filter_channels)
+#         self.proj = torch.nn.Conv1d(filter_channels, 1, 1)
+
+#     def forward(self, x, x_mask):
+#         x = self.conv_1(x * x_mask)
+#         x = self.balancer(x)
+#         x = self.activation(x)
+#         x = self.norm_1(x)
+#         x = self.drop(x)
+#         x = self.conv_2(x * x_mask)
+#         x = self.balancer(x)
+#         x = self.activation(x)
+#         x = self.norm_2(x)
+#         x = self.drop(x)
+#         x = self.proj(x * x_mask)
+#         return x * x_mask
+
+
 class MultiHeadAttention(BaseModule):
     def __init__(
         self,
@@ -153,12 +184,8 @@ class MultiHeadAttention(BaseModule):
         if window_size is not None:
             n_heads_rel = 1 if heads_share else n_heads
             rel_stddev = self.k_channels**-0.5
-            self.emb_rel_k = torch.nn.Parameter(
-                torch.randn(n_heads_rel, window_size * 2 + 1, self.k_channels) * rel_stddev
-            )
-            self.emb_rel_v = torch.nn.Parameter(
-                torch.randn(n_heads_rel, window_size * 2 + 1, self.k_channels) * rel_stddev
-            )
+            self.emb_rel_k = torch.nn.Parameter(torch.randn(n_heads_rel, window_size * 2 + 1, self.k_channels) * rel_stddev)
+            self.emb_rel_v = torch.nn.Parameter(torch.randn(n_heads_rel, window_size * 2 + 1, self.k_channels) * rel_stddev)
         self.conv_o = torch.nn.Conv1d(channels, out_channels, 1)
         self.drop = torch.nn.Dropout(p_dropout)
 
@@ -280,17 +307,7 @@ class FFN(BaseModule):
 
 
 class Encoder(BaseModule):
-    def __init__(
-        self,
-        hidden_channels,
-        filter_channels,
-        n_heads,
-        n_layers,
-        kernel_size=1,
-        p_dropout=0.0,
-        window_size=None,
-        **kwargs
-    ):
+    def __init__(self, hidden_channels, filter_channels, n_heads, n_layers, kernel_size=1, p_dropout=0.0, window_size=None, **kwargs):
         super(Encoder, self).__init__()
         self.hidden_channels = hidden_channels
         self.filter_channels = filter_channels
@@ -393,6 +410,12 @@ class TextEncoder(BaseModule):
             kernel_size,
             p_dropout,
         )
+        # self.proj_p = PitchPredictor(
+        #     n_channels + (spk_emb_dim if n_spks > 1 else 0),
+        #     filter_channels_dp,
+        #     kernel_size,
+        #     p_dropout,
+        # )
 
     def forward(self, x, x_lengths, spk=None):
         x = self.emb(x) * math.sqrt(self.n_channels)
@@ -407,5 +430,6 @@ class TextEncoder(BaseModule):
 
         x_dp = torch.detach(x)
         logw = self.proj_w(x_dp, x_mask)
+        # logp = self.proj_p(x_dp, x_mask)
 
-        return mu, logw, x_mask
+        return mu, logw, x_mask  # , logp

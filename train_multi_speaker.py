@@ -66,9 +66,7 @@ if __name__ == "__main__":
     logger = SummaryWriter(log_dir=log_dir)
 
     print('Initializing data loaders...')
-    train_dataset = TextMelSpeakerDataset(
-        train_filelist_path, cmudict_path, add_blank, n_fft, n_feats, sample_rate, hop_length, win_length, f_min, f_max
-    )
+    train_dataset = TextMelSpeakerDataset(train_filelist_path, cmudict_path, add_blank, n_fft, n_feats, sample_rate, hop_length, win_length, f_min, f_max)
     batch_collate = TextMelSpeakerBatchCollate()
     loader = DataLoader(
         dataset=train_dataset,
@@ -78,9 +76,7 @@ if __name__ == "__main__":
         num_workers=8,
         shuffle=True,
     )
-    test_dataset = TextMelSpeakerDataset(
-        valid_filelist_path, cmudict_path, add_blank, n_fft, n_feats, sample_rate, hop_length, win_length, f_min, f_max
-    )
+    test_dataset = TextMelSpeakerDataset(valid_filelist_path, cmudict_path, add_blank, n_fft, n_feats, sample_rate, hop_length, win_length, f_min, f_max)
 
     print('Initializing model...')
     model = GradTTS(
@@ -140,9 +136,7 @@ if __name__ == "__main__":
                     global_step=iteration,
                     dataformats='HWC',
                 )
-                logger.add_image(
-                    f'image_{i}/alignment', plot_tensor(attn.squeeze().cpu()), global_step=iteration, dataformats='HWC'
-                )
+                logger.add_image(f'image_{i}/alignment', plot_tensor(attn.squeeze().cpu()), global_step=iteration, dataformats='HWC')
                 save_plot(y_enc.squeeze().cpu(), f'{log_dir}/generated_enc_{i}.png')
                 save_plot(y_dec.squeeze().cpu(), f'{log_dir}/generated_dec_{i}.png')
                 save_plot(attn.squeeze().cpu(), f'{log_dir}/alignment_{i}.png')
@@ -157,9 +151,7 @@ if __name__ == "__main__":
                 x, x_lengths = batch['x'].cuda(), batch['x_lengths'].cuda()
                 y, y_lengths = batch['y'].cuda(), batch['y_lengths'].cuda()
                 spk = batch['spk'].cuda()
-                dur_loss, prior_loss, diff_loss = model.compute_loss(
-                    x, x_lengths, y, y_lengths, spk=spk, out_size=out_size
-                )
+                dur_loss, prior_loss, diff_loss = model.compute_loss(x, x_lengths, y, y_lengths, spk=spk, out_size=out_size)
                 loss = sum([dur_loss, prior_loss, diff_loss])
                 loss.backward()
 
@@ -173,10 +165,7 @@ if __name__ == "__main__":
                 logger.add_scalar('training/encoder_grad_norm', enc_grad_norm, global_step=iteration)
                 logger.add_scalar('training/decoder_grad_norm', dec_grad_norm, global_step=iteration)
 
-                msg = (
-                    f'Epoch: {epoch}, iteration: {iteration} | dur_loss: {dur_loss.item()}, prior_loss:'
-                    f' {prior_loss.item()}, diff_loss: {diff_loss.item()}'
-                )
+                msg = f'Epoch: {epoch}, iteration: {iteration} | dur_loss: {dur_loss.item()}, prior_loss: {prior_loss.item()}, diff_loss: {diff_loss.item()}'
                 progress_bar.set_description(msg)
 
                 dur_losses.append(dur_loss.item())

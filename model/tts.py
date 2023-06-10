@@ -19,7 +19,25 @@ from model.utils import sequence_mask, generate_path, duration_loss, fix_len_com
 
 
 class GradTTS(BaseModule):
-    def __init__(self, n_vocab, n_spks, spk_emb_dim, n_enc_channels, filter_channels, filter_channels_dp, n_heads, n_enc_layers, enc_kernel, enc_dropout, window_size, n_feats, dec_dim, beta_min, beta_max, pe_scale):
+    def __init__(
+        self,
+        n_vocab,
+        n_spks,
+        spk_emb_dim,
+        n_enc_channels,
+        filter_channels,
+        filter_channels_dp,
+        n_heads,
+        n_enc_layers,
+        enc_kernel,
+        enc_dropout,
+        window_size,
+        n_feats,
+        dec_dim,
+        beta_min,
+        beta_max,
+        pe_scale,
+    ):
         super(GradTTS, self).__init__()
         self.n_vocab = n_vocab
         self.n_spks = n_spks
@@ -94,7 +112,7 @@ class GradTTS(BaseModule):
 
         return encoder_outputs, decoder_outputs, attn[:, :, :y_max_length]
 
-    def compute_loss(self, x, x_lengths, y, y_lengths, spk=None, out_size=None):
+    def compute_loss(self, x, x_lengths, y, y_lengths, y_pitch, spk=None, out_size=None):
         """
         Computes 3 losses:
             1. duration loss: loss between predicted token durations and those extracted by Monotonic Alignment Search (MAS).
@@ -137,6 +155,9 @@ class GradTTS(BaseModule):
         # Compute loss between predicted log-scaled durations and those obtained from MAS
         logw_ = torch.log(1e-8 + torch.sum(attn.unsqueeze(1), -1)) * x_mask
         dur_loss = duration_loss(logw, logw_, x_lengths)
+
+        # Compute loss between predicted pitch and ground truth
+        print(y_pitch.shape)
 
         # Cut a small segment of mel-spectrogram in order to increase batch size
         if not isinstance(out_size, type(None)):

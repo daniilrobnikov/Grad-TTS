@@ -41,3 +41,8 @@ def generate_path(duration, mask):
 def duration_loss(logw, logw_, lengths):
     loss = torch.sum((logw - logw_) ** 2) / torch.sum(lengths)
     return loss
+
+
+def pitch_loss(logp, logp_, lengths):
+    loss = torch.sum((logp - logp_) ** 2) / torch.sum(lengths)
+    return loss

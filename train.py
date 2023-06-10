@@ -160,12 +160,12 @@ if __name__ == "__main__":
                 model.zero_grad()
                 x, x_lengths = batch["x"], batch["x_lengths"]
                 y, y_lengths = batch["y"], batch["y_lengths"]
+                y_pitch = batch["y_pitch"]
                 # x, x_lengths = batch["x"].to(device), batch["x_lengths"].to(device)
                 # y, y_lengths = batch["y"].to(device), batch["y_lengths"].to(device)
 
                 with accelerator.autocast():  # Enable mixed-precision training
-                    dur_loss, prior_loss, diff_loss = model.compute_loss(x, x_lengths, y, y_lengths, out_size=out_size)
-
+                    dur_loss, prior_loss, diff_loss = model.compute_loss(x, x_lengths, y, y_lengths, y_pitch, out_size=out_size)
                     loss = sum([dur_loss, prior_loss, diff_loss])
                 accelerator.backward(loss)
 

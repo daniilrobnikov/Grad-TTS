@@ -9,3 +9,4 @@ librosa
 scipy
 tqdm
 accelerate
+pyworld
