@@ -159,6 +159,9 @@ class GradTTS(BaseModule):
 
         # Compute loss between predicted pitch and ground truth
         print(f"Then y_pitch type: {type(y_pitch)}")
+        print(f"Then y_pitch shape: {y_pitch.shape}")
+        print(f"Then x shape: {x.shape}")
+        print(f"Then x_lengths shape: {x_lengths.shape}")
 
         # Cut a small segment of mel-spectrogram in order to increase batch size
         if not isinstance(out_size, type(None)):
