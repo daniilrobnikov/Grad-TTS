@@ -113,26 +113,27 @@ class TextMelBatchCollate(object):
         y_max_length = max([item["y"].shape[-1] for item in batch])
         y_max_length = fix_len_compatibility(y_max_length)
         x_max_length = max([item["x"].shape[-1] for item in batch])
+        y_pitch_max_length = max([item["y_pitch"].shape[-1] for item in batch])
         n_feats = batch[0]["y"].shape[-2]
 
         y = torch.zeros((B, n_feats, y_max_length), dtype=torch.float32)
         x = torch.zeros((B, x_max_length), dtype=torch.long)
+        y_pitch = torch.zeros((B, y_pitch_max_length), dtype=torch.float32)
         y_lengths, x_lengths = [], []
-        print(f"pitch shape: {batch[0]['pitch'].shape}")
-        print(f"B shape: {B}")
-        # y_pitch = []
+        print(f"y shape: {y.shape}")
+        print(f"pitch shape: {y_pitch.shape}")
 
         for i, item in enumerate(batch):
-            y_, x_, y_pitch_ = item["y"], item["x"]  # , item["pitch"]
+            y_, x_, y_pitch_ = item["y"], item["x"], item["pitch"]
             y_lengths.append(y_.shape[-1])
             x_lengths.append(x_.shape[-1])
             y[i, :, : y_.shape[-1]] = y_
             x[i, : x_.shape[-1]] = x_
-            # y_pitch.append(y_pitch_)
+            y_pitch.append(y_pitch_)
 
         y_lengths = torch.LongTensor(y_lengths)
         x_lengths = torch.LongTensor(x_lengths)
-        return {"x": x, "x_lengths": x_lengths, "y": y, "y_lengths": y_lengths, "y_pitch": batch[0]['pitch']}  # y_pitch}
+        return {"x": x, "x_lengths": x_lengths, "y": y, "y_lengths": y_lengths, "y_pitch": y_pitch}
 
 
 class TextMelSpeakerDataset(torch.utils.data.Dataset):
