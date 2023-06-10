@@ -157,7 +157,7 @@ class GradTTS(BaseModule):
         dur_loss = duration_loss(logw, logw_, x_lengths)
 
         # Compute loss between predicted pitch and ground truth
-        print(y_pitch)
+        print(y_pitch.shape)
 
         # Cut a small segment of mel-spectrogram in order to increase batch size
         if not isinstance(out_size, type(None)):
