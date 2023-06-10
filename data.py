@@ -118,6 +118,7 @@ class TextMelBatchCollate(object):
         y = torch.zeros((B, n_feats, y_max_length), dtype=torch.float32)
         x = torch.zeros((B, x_max_length), dtype=torch.long)
         y_lengths, x_lengths = [], []
+        print(f"pitch type: {type(batch[0]['pitch'])}")
         y_pitch = []
 
         for i, item in enumerate(batch):

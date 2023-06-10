@@ -128,9 +128,6 @@ class GradTTS(BaseModule):
             out_size (int, optional): length (in mel's sampling rate) of segment to cut, on which decoder will be trained.
                 Should be divisible by 2^{num of UNet downsamplings}. Needed to increase batch size.
         """
-        print(f"y type: {type(y)}")
-        print(f"y_lengths type: {type(y_lengths)}")
-        print(f"y_pitch type: {type(y_pitch)}")
         x, x_lengths, y, y_lengths = self.relocate_input([x, x_lengths, y, y_lengths])
 
         if self.n_spks > 1:
@@ -161,8 +158,6 @@ class GradTTS(BaseModule):
         dur_loss = duration_loss(logw, logw_, x_lengths)
 
         # Compute loss between predicted pitch and ground truth
-        print(f"Then y type: {type(y)}")
-        print(f"Then y_lengths type: {type(y_lengths)}")
         print(f"Then y_pitch type: {type(y_pitch)}")
 
         # Cut a small segment of mel-spectrogram in order to increase batch size
