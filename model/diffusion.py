@@ -85,6 +85,7 @@ class AttentionModule(nn.Module):
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x, mask):
+        print(f"AttentionModule input: {x.shape}, {mask.shape}")
         # Trunk branch
         output_trunk = x * mask
         for block in self.trunk_branch:
@@ -100,6 +101,7 @@ class AttentionModule(nn.Module):
         output_mask = self.softmax(output_mask)
 
         # Combine both
+        print(f"AttentionModule output: {output_trunk.shape}, {output_mask.shape}")
         output = (1 + output_mask) * output_trunk
         return output
 
