@@ -89,10 +89,6 @@ class TextMelDataset(torch.utils.data.Dataset):
 
         frame_period = audio_np.shape[0] * 1000 / (sr * mel_length) + 1e-8
 
-        print(f"frame_period: {frame_period}")
-        print(f"mel_length: {mel_length}")
-        print(f"audio_np: {audio_np.shape}")
-
         _f0, t = pw.dio(audio_np, sr, frame_period=frame_period)  # raw pitch extractor
         f0 = pw.stonemask(audio_np, _f0, t, sr)  # pitch refinement
         f0 = torch.from_numpy(f0).float()
@@ -127,8 +123,8 @@ class TextMelBatchCollate(object):
         x = torch.zeros((B, x_max_length), dtype=torch.long)
         y_pitch = torch.zeros((B, y_pitch_max_length), dtype=torch.float32)
         y_lengths, x_lengths = [], []
-        print(f"y_max_length shape: {y_max_length.shape}")
-        print(f"y_pitch_max_length shape: {y_pitch_max_length.shape}")
+        print(f"y_max_length shape: {y_max_length}")
+        print(f"y_pitch_max_length shape: {y_pitch_max_length}")
 
         for i, item in enumerate(batch):
             y_, x_, y_pitch_ = item["y"], item["x"], item["pitch"]
