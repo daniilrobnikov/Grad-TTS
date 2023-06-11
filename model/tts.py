@@ -85,7 +85,7 @@ class GradTTS(BaseModule):
             # Get speaker embedding
             spk = self.spk_emb(spk)
 
-        # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
+        # Get encoder_outputs `mu_x`, log-scaled token durations `logw`, log-scaled pitch `logp`
         mu_x, logw, x_mask = self.encoder(x, x_lengths, spk)
 
         w = torch.exp(logw) * x_mask
@@ -157,14 +157,15 @@ class GradTTS(BaseModule):
         logw_ = torch.log(1e-8 + torch.sum(attn.unsqueeze(1), -1)) * x_mask
         dur_loss = duration_loss(logw, logw_, x_lengths)
 
-        # Compute loss between predicted pitch and ground truth
+        # Compute loss between predicted pitch and ground truth y_pitch
+        # logp_ = torch.log(1e-8 + torch.sum(attn.unsqueeze(1), -1)) * x_mask
+        # pitch_loss = pitch_loss_fn(logp_, y_pitch, x_lengths)
         print(f"Then y shape: {y.shape}")
-        print(f"Then y_pitch shape: {y_pitch.shape}")
-        print(f"Then mu_x shape: {mu_x.shape}")
         print(f"Then logw shape: {logw.shape}")
-        print(f"Then logw_ shape: {logw_.shape}")
-        print(f"Then x_mask shape: {x_mask.shape}")
-        print(f"Then attn shape: {attn.shape}")
+        print(f"Then y_pitch shape: {y_pitch.shape}")
+        # Print max and min of y_pitch
+        print(f"Max of y_pitch: {torch.max(y_pitch)}")
+        print(f"Min of y_pitch: {torch.min(y_pitch)}")
 
         # Cut a small segment of mel-spectrogram in order to increase batch size
         if not isinstance(out_size, type(None)):

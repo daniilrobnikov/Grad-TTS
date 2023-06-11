@@ -59,7 +59,7 @@ class TextMelDataset(torch.utils.data.Dataset):
 
         text = self.get_text(text, add_blank=self.add_blank)
         mel = self.get_mel(audio, sr)
-        pitch = self.get_pitch(audio, sr)
+        pitch = self.get_pitch(audio, sr, mel.shape[1])  # pitch length is the same as mel length
         return (text, mel, pitch)
 
     def get_text(self, text, add_blank=True):
@@ -83,10 +83,13 @@ class TextMelDataset(torch.utils.data.Dataset):
         ).squeeze()
         return mel
 
-    def get_pitch(self, audio, sr):
+    def get_pitch(self, audio, sr, mel_length):
         audio_np = audio.numpy()[0]
         audio_np = audio_np.astype(np.float64)
-        _f0, t = pw.dio(audio_np, sr)  # raw pitch extractor
+
+        frame_period = audio_np * 1000 / (sr * mel_length) + 1e-8
+
+        _f0, t = pw.dio(audio_np, sr, frame_period=frame_period)  # raw pitch extractor
         f0 = pw.stonemask(audio_np, _f0, t, sr)  # pitch refinement
         f0 = torch.from_numpy(f0).float()
         return f0
@@ -120,8 +123,8 @@ class TextMelBatchCollate(object):
         x = torch.zeros((B, x_max_length), dtype=torch.long)
         y_pitch = torch.zeros((B, y_pitch_max_length), dtype=torch.float32)
         y_lengths, x_lengths = [], []
-        print(f"y shape: {y.shape}")
-        print(f"pitch shape: {y_pitch.shape}")
+        print(f"y_max_length shape: {y_max_length.shape}")
+        print(f"y_pitch_max_length shape: {y_pitch_max_length.shape}")
 
         for i, item in enumerate(batch):
             y_, x_, y_pitch_ = item["y"], item["x"], item["pitch"]
