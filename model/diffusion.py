@@ -8,6 +8,8 @@
 
 import math
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 from einops import rearrange
 
 from model.base import BaseModule
@@ -15,13 +17,13 @@ from model.base import BaseModule
 
 class Mish(BaseModule):
     def forward(self, x):
-        return x * torch.tanh(torch.nn.functional.softplus(x))
+        return x * torch.tanh(F.softplus(x))
 
 
 class Upsample(BaseModule):
     def __init__(self, dim):
         super(Upsample, self).__init__()
-        self.conv = torch.nn.ConvTranspose2d(dim, dim, 4, 2, 1)
+        self.conv = nn.ConvTranspose2d(dim, dim, 4, 2, 1)
 
     def forward(self, x):
         return self.conv(x)
@@ -30,7 +32,7 @@ class Upsample(BaseModule):
 class Downsample(BaseModule):
     def __init__(self, dim):
         super(Downsample, self).__init__()
-        self.conv = torch.nn.Conv2d(dim, dim, 3, 2, 1)
+        self.conv = nn.Conv2d(dim, dim, 3, 2, 1)
 
     def forward(self, x):
         return self.conv(x)
@@ -40,7 +42,7 @@ class Rezero(BaseModule):
     def __init__(self, fn):
         super(Rezero, self).__init__()
         self.fn = fn
-        self.g = torch.nn.Parameter(torch.zeros(1))
+        self.g = nn.Parameter(torch.zeros(1))
 
     def forward(self, x):
         return self.fn(x) * self.g
@@ -49,40 +51,135 @@ class Rezero(BaseModule):
 class Block(BaseModule):
     def __init__(self, dim, dim_out, groups=8):
         super(Block, self).__init__()
-        self.block = torch.nn.Sequential(
-            torch.nn.Conv2d(dim, dim_out, 3, padding=1), torch.nn.GroupNorm(groups, dim_out), Mish()
-        )
+        self.block = nn.Sequential(nn.Conv2d(dim, dim_out, 3, padding=1), nn.GroupNorm(groups, dim_out), Mish())
 
     def forward(self, x, mask):
         output = self.block(x * mask)
         return output * mask
 
 
-class ResnetBlock(BaseModule):
-    def __init__(self, dim, dim_out, time_emb_dim, groups=8):
-        super(ResnetBlock, self).__init__()
+class MaskBlock(nn.Module):
+    def __init__(self, dim, dim_out, groups=8):
+        super(MaskBlock, self).__init__()
+        self.block = torch.nn.Sequential(torch.nn.Conv2d(dim, dim_out, 3, padding=1), torch.nn.GroupNorm(groups, dim_out), nn.Mish())
 
-        self.block1 = Block(dim, dim_out, groups=groups)
-        self.mlp = torch.nn.Sequential(Mish(), torch.nn.Linear(time_emb_dim, dim_out))
-        self.block2 = Block(dim_out, dim_out, groups=groups)
+    def forward(self, x):
+        output = self.block(x)
+        return output
+
+
+class AttentionModule(nn.Module):
+    def __init__(self, dim, dim_out, groups=8):
+        super(AttentionModule, self).__init__()
+
+        self.trunk_branch = nn.ModuleList()
+        self.trunk_branch.append(MaskBlock(dim, dim_out, groups))
+        self.trunk_branch.append(MaskBlock(dim_out, dim_out, groups))
+
+        self.mask_branch = nn.ModuleList()
+        self.mask_branch.append(nn.AvgPool2d(3, stride=2, padding=1, count_include_pad=False))
+        self.mask_branch.append(MaskBlock(dim, dim_out, groups))
+        self.mask_branch.append(MaskBlock(dim_out, dim_out, groups))
+        self.mask_branch.append(nn.UpsamplingBilinear2d(scale_factor=2))
+
+        self.softmax = nn.Softmax(dim=1)
+
+    def forward(self, x, mask):
+        # Trunk branch
+        output_trunk = x * mask
+        for block in self.trunk_branch:
+            x = block(x)
+            output_trunk = output_trunk * mask
+
+        # Mask branch
+        output_mask = output_trunk * mask
+        for block in self.mask_branch:
+            output_mask = block(output_mask)
+        output_mask = output_mask * mask
+
+        output_mask = self.softmax(output_mask)
+
+        # Combine both
+        output = (1 + output_mask) * output_trunk
+        return output
+
+
+class RANBlock(nn.Module):
+    def __init__(self, dim, dim_out, time_emb_dim, groups=8):
+        super(RANBlock, self).__init__()
+
+        self.attention_module = AttentionModule(dim, dim_out, groups=groups)
+        self.mlp = torch.nn.Sequential(nn.Mish(), torch.nn.Linear(time_emb_dim, dim_out))
+
         if dim != dim_out:
             self.res_conv = torch.nn.Conv2d(dim, dim_out, 1)
         else:
             self.res_conv = torch.nn.Identity()
 
     def forward(self, x, mask, time_emb):
-        h = self.block1(x, mask)
+        h = self.attention_module(x, mask)
         h += self.mlp(time_emb).unsqueeze(-1).unsqueeze(-1)
-        h = self.block2(h, mask)
         output = h + self.res_conv(x * mask)
         return output
+
+
+# class ResnetBlock(BaseModule):
+#     def __init__(self, dim, dim_out, time_emb_dim, groups=8):
+#         super(ResnetBlock, self).__init__()
+
+#         self.block1 = Block(dim, dim_out, groups=groups)
+#         self.mlp = torch.nn.Sequential(Mish(), torch.nn.Linear(time_emb_dim, dim_out))
+#         self.block2 = Block(dim_out, dim_out, groups=groups)
+#         if dim != dim_out:
+#             self.res_conv = torch.nn.Conv2d(dim, dim_out, 1)
+#         else:
+#             self.res_conv = torch.nn.Identity()
+
+#     def forward(self, x, mask, time_emb):
+#         h = self.block1(x, mask)
+#         h += self.mlp(time_emb).unsqueeze(-1).unsqueeze(-1)
+#         h = self.block2(h, mask)
+#         output = h + self.res_conv(x * mask)
+#         return output
+
+
+# class LinearAttention(BaseModule):
+#     def __init__(self, dim, heads=4, dim_head=32):
+#         super(LinearAttention, self).__init__()
+#         self.heads = heads
+#         self.scale = dim_head**-0.5
+#         hidden_dim = dim_head * heads
+#         self.to_qkv = torch.nn.Conv2d(dim, hidden_dim * 3, 1, bias=False)
+#         self.to_out = torch.nn.Conv2d(hidden_dim, dim, 1)
+
+#     def forward(self, x):
+#         b, c, h, w = x.shape
+#         qkv = self.to_qkv(x)
+#         q, k, v = rearrange(qkv, 'b (qkv heads c) h w -> qkv b heads c (h w)', heads=self.heads, qkv=3)
+
+#         q = q * self.scale  # scale query
+#         k = k * self.scale  # scale key
+#         dots = torch.einsum('bhid,bhjd->bhij', q, k)  # calculating dot product
+#         attn = dots.softmax(dim=-1)  # softmax to get probabilities
+
+#         out = torch.einsum('bhij,bhjd->bhid', attn, v)  # calculate weighted sum of values
+#         out = rearrange(
+#             out, 'b heads c (h w) -> b (heads c) h w', heads=self.heads, h=h, w=w
+#         )  # reshape to original shape
+
+#         return self.to_out(out)
+
+#         k = k.softmax(dim=-1)
+#         context = torch.einsum('bhdn,bhen->bhde', k, v)
+#         out = torch.einsum('bhde,bhdn->bhen', context, q)
+#         out = rearrange(out, 'b heads c (h w) -> b (heads c) h w', heads=self.heads, h=h, w=w)
+#         return self.to_out(out)
 
 
 class LinearAttention(BaseModule):
     def __init__(self, dim, heads=4, dim_head=32):
         super(LinearAttention, self).__init__()
         self.heads = heads
-        self.scale = dim_head**-0.5
         hidden_dim = dim_head * heads
         self.to_qkv = torch.nn.Conv2d(dim, hidden_dim * 3, 1, bias=False)
         self.to_out = torch.nn.Conv2d(hidden_dim, dim, 1)
@@ -91,23 +188,8 @@ class LinearAttention(BaseModule):
         b, c, h, w = x.shape
         qkv = self.to_qkv(x)
         q, k, v = rearrange(qkv, 'b (qkv heads c) h w -> qkv b heads c (h w)', heads=self.heads, qkv=3)
-
-        q = q * self.scale  # scale query
-        k = k * self.scale  # scale key
-        dots = torch.einsum('bhid,bhjd->bhij', q, k)  # calculating dot product
-        attn = dots.softmax(dim=-1)  # softmax to get probabilities
-
-        out = torch.einsum('bhij,bhjd->bhid', attn, v)  # calculate weighted sum of values
-        out = rearrange(
-            out, 'b heads c (h w) -> b (heads c) h w', heads=self.heads, h=h, w=w
-        )  # reshape to original shape
-
-        return self.to_out(out)
-
-        k = k.softmax(dim=-1)
-        context = torch.einsum('bhdn,bhen->bhde', k, v)
-        out = torch.einsum('bhde,bhdn->bhen', context, q)
-        out = rearrange(out, 'b heads c (h w) -> b (heads c) h w', heads=self.heads, h=h, w=w)
+        attn = torch.nn.functional.scaled_dot_product_attention(q, k, v, dropout_p=0.2)  # calculating dot product
+        out = rearrange(attn, 'b heads c (h w) -> b (heads c) h w', heads=self.heads, h=h, w=w)
         return self.to_out(out)
 
 
@@ -147,9 +229,7 @@ class GradLogPEstimator2d(BaseModule):
         self.pe_scale = pe_scale
 
         if n_spks > 1:
-            self.spk_mlp = torch.nn.Sequential(
-                torch.nn.Linear(spk_emb_dim, spk_emb_dim * 4), Mish(), torch.nn.Linear(spk_emb_dim * 4, n_feats)
-            )
+            self.spk_mlp = torch.nn.Sequential(torch.nn.Linear(spk_emb_dim, spk_emb_dim * 4), Mish(), torch.nn.Linear(spk_emb_dim * 4, n_feats))
         self.time_pos_emb = SinusoidalPosEmb(dim)
         self.mlp = torch.nn.Sequential(torch.nn.Linear(dim, dim * 4), Mish(), torch.nn.Linear(dim * 4, dim))
 
@@ -164,8 +244,8 @@ class GradLogPEstimator2d(BaseModule):
             self.downs.append(
                 torch.nn.ModuleList(
                     [
-                        ResnetBlock(dim_in, dim_out, time_emb_dim=dim),
-                        ResnetBlock(dim_out, dim_out, time_emb_dim=dim),
+                        RANBlock(dim_in, dim_out, time_emb_dim=dim),
+                        RANBlock(dim_out, dim_out, time_emb_dim=dim),
                         Residual(Rezero(LinearAttention(dim_out))),
                         Downsample(dim_out) if not is_last else torch.nn.Identity(),
                     ]
@@ -173,16 +253,16 @@ class GradLogPEstimator2d(BaseModule):
             )
 
         mid_dim = dims[-1]
-        self.mid_block1 = ResnetBlock(mid_dim, mid_dim, time_emb_dim=dim)
+        self.mid_block1 = RANBlock(mid_dim, mid_dim, time_emb_dim=dim)
         self.mid_attn = Residual(Rezero(LinearAttention(mid_dim)))
-        self.mid_block2 = ResnetBlock(mid_dim, mid_dim, time_emb_dim=dim)
+        self.mid_block2 = RANBlock(mid_dim, mid_dim, time_emb_dim=dim)
 
         for ind, (dim_in, dim_out) in enumerate(reversed(in_out[1:])):
             self.ups.append(
                 torch.nn.ModuleList(
                     [
-                        ResnetBlock(dim_out * 2, dim_in, time_emb_dim=dim),
-                        ResnetBlock(dim_in, dim_in, time_emb_dim=dim),
+                        RANBlock(dim_out * 2, dim_in, time_emb_dim=dim),
+                        RANBlock(dim_in, dim_in, time_emb_dim=dim),
                         Residual(Rezero(LinearAttention(dim_in))),
                         Upsample(dim_in),
                     ]
