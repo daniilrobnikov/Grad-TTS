@@ -126,7 +126,6 @@ class ConvSwishNorm(BaseModule):
 #         self.proj = torch.nn.Conv1d(filter_channels, 1, 1)
 
 #     def forward(self, x, x_mask):
-#         print(x.shape)
 #         x = self.conv_1(x * x_mask)
 #         x = self.balancer(x)
 #         x = self.activation(x)
@@ -138,7 +137,6 @@ class ConvSwishNorm(BaseModule):
 #         x = self.norm_2(x)
 #         x = self.drop(x)
 #         x = self.proj(x * x_mask)
-#         print(x.shape)
 #         return x * x_mask
 
 
@@ -165,13 +163,13 @@ class Predictor(BaseModule):
 
 
 class DurationPredictor(Predictor):
-    def __init__(self, **kwargs):
-        super().__init__(dropout=0.5, **kwargs)
+    def __init__(self, input_dim, hidden_dim, **kwargs):
+        super().__init__(input_dim, hidden_dim, dropout=0.5, **kwargs)
 
 
 class PitchPredictor(Predictor):
-    def __init__(self, **kwargs):
-        super().__init__(dropout=0.2, **kwargs)
+    def __init__(self, input_dim, hidden_dim, **kwargs):
+        super().__init__(input_dim, hidden_dim, dropout=0.2, **kwargs)
 
 
 class MultiHeadAttention(BaseModule):
