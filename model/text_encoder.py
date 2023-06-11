@@ -144,9 +144,9 @@ class Predictor(BaseModule):
     def __init__(self, input_dim, hidden_dim, num_layers=30, attention_layers_every=3, kernel_size=3, nhead=8, dropout=0.2):
         super(Predictor, self).__init__()
         self.layers = torch.nn.ModuleList()
-        self.layers.append(torch.nn.Conv1d(input_dim, hidden_dim, kernel_size=kernel_size, padding=1))
+        self.layers.append(torch.nn.Conv1d(input_dim, hidden_dim, kernel_size=kernel_size, padding=kernel_size // 2))
         for layer in range(num_layers):
-            self.layers.append(torch.nn.Conv1d(hidden_dim, hidden_dim, kernel_size=kernel_size, padding=1))
+            self.layers.append(torch.nn.Conv1d(hidden_dim, hidden_dim, kernel_size=kernel_size, padding=kernel_size // 2))
             self.layers.append(torch.nn.ReLU())
             self.layers.append(torch.nn.LayerNorm(hidden_dim))
             if layer % attention_layers_every == 2:
@@ -415,7 +415,7 @@ class TextEncoder(BaseModule):
         self.prenet = ConvSwishNorm(n_channels, n_channels, n_channels, kernel_size=5, n_layers=3, p_dropout=0.5)
         self.encoder = Encoder(n_channels + (spk_emb_dim if n_spks > 1 else 0), filter_channels, n_heads, n_layers, kernel_size, p_dropout, window_size=window_size)
         self.proj_m = torch.nn.Conv1d(n_channels + (spk_emb_dim if n_spks > 1 else 0), n_feats, 1)
-        self.proj_w = DurationPredictor(n_channels + (spk_emb_dim if n_spks > 1 else 0), filter_channels_dp)
+        self.proj_w = DurationPredictor(n_channels + (spk_emb_dim if n_spks > 1 else 0), filter_channels_dp, kernel_size=kernel_size)
         # self.proj_w = DurationPredictor(
         #     n_channels + (spk_emb_dim if n_spks > 1 else 0),
         #     filter_channels_dp,
