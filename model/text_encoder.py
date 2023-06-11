@@ -91,95 +91,98 @@ class ConvSwishNorm(BaseModule):
         return x * x_mask
 
 
-class DurationPredictor(BaseModule):
-    def __init__(self, in_channels, filter_channels, kernel_size, p_dropout):
-        super(DurationPredictor, self).__init__()
-        self.in_channels = in_channels
-        self.filter_channels = filter_channels
-        self.p_dropout = p_dropout
+# class DurationPredictor(BaseModule):
+#     def __init__(self, in_channels, filter_channels, kernel_size, p_dropout):
+#         super(DurationPredictor, self).__init__()
+#         self.in_channels = in_channels
+#         self.filter_channels = filter_channels
+#         self.p_dropout = p_dropout
 
-        # self.layers = torch.nn.ModuleList()
-        # num_layers = 2
+#         # self.layers = torch.nn.ModuleList()
+#         # num_layers = 2
 
-        # for _ in range(num_layers):
-        #     self.layers.append(
-        #         torch.nn.Conv1d(
-        #             in_channels,
-        #             filter_channels,
-        #             kernel_size,
-        #             padding=kernel_size // 2,
-        #         )
-        #     )
-        #     self.layers.append(ActivationBalancer(filter_channels, channel_dim=1))
-        #     self.layers.append(DoubleSwish())
-        #     self.layers.append(torch.nn.LayerNorm(filter_channels))
-        #     self.layers.append(torch.nn.Dropout(p_dropout))
-        # self.proj = torch.nn.Conv1d(filter_channels, 1, 1)
+#         # for _ in range(num_layers):
+#         #     self.layers.append(
+#         #         torch.nn.Conv1d(
+#         #             in_channels,
+#         #             filter_channels,
+#         #             kernel_size,
+#         #             padding=kernel_size // 2,
+#         #         )
+#         #     )
+#         #     self.layers.append(ActivationBalancer(filter_channels, channel_dim=1))
+#         #     self.layers.append(DoubleSwish())
+#         #     self.layers.append(torch.nn.LayerNorm(filter_channels))
+#         #     self.layers.append(torch.nn.Dropout(p_dropout))
+#         # self.proj = torch.nn.Conv1d(filter_channels, 1, 1)
 
-        self.balancer = ActivationBalancer(filter_channels, channel_dim=1)
-        self.activation = DoubleSwish()
-        self.drop = torch.nn.Dropout(p_dropout)
-        self.conv_1 = torch.nn.Conv1d(in_channels, filter_channels, kernel_size, padding=kernel_size // 2)
-        self.norm_1 = LayerNorm(filter_channels)
-        self.conv_2 = torch.nn.Conv1d(filter_channels, filter_channels, kernel_size, padding=kernel_size // 2)
-        self.norm_2 = LayerNorm(filter_channels)
-        self.proj = torch.nn.Conv1d(filter_channels, 1, 1)
-
-    def forward(self, x, x_mask):
-        print(f"Input: {x.shape}")
-        x = self.conv_1(x * x_mask)
-        x = self.balancer(x)
-        x = self.activation(x)
-        print(f"Before norm: {x.shape}")
-        x = self.norm_1(x)
-        x = self.drop(x)
-        x = self.conv_2(x * x_mask)
-        x = self.balancer(x)
-        x = self.activation(x)
-        x = self.norm_2(x)
-        x = self.drop(x)
-        print(f"Before proj x: {x.shape}")
-        print(f"Before proj x_mask: {x_mask.shape}")
-        x = self.proj(x * x_mask)
-        print(f"Output: {x.shape}")
-        return x * x_mask
-
-
-# class Predictor(BaseModule):
-#     def __init__(self, input_dim, hidden_dim, num_layers=30, attention_layers_every=3, kernel_size=3, nhead=8, dropout=0.2):
-#         super(Predictor, self).__init__()
-#         self.layers = torch.nn.ModuleList()
-#         self.layers.append(torch.nn.Conv1d(input_dim, hidden_dim, kernel_size=kernel_size, padding=kernel_size // 2))
-#         for layer in range(num_layers):
-#             self.layers.append(torch.nn.Conv1d(hidden_dim, hidden_dim, kernel_size=kernel_size, padding=kernel_size // 2))
-#             self.layers.append(torch.nn.ReLU())
-#             self.layers.append(LayerNorm(hidden_dim))
-#             if layer % attention_layers_every == 2:
-#                 self.layers.append(torch.nn.TransformerEncoderLayer(hidden_dim, nhead, dropout=dropout))
-#         self.proj = torch.nn.Conv1d(hidden_dim, 1, 1)
+#         self.balancer = ActivationBalancer(filter_channels, channel_dim=1)
+#         self.activation = DoubleSwish()
+#         self.drop = torch.nn.Dropout(p_dropout)
+#         self.conv_1 = torch.nn.Conv1d(in_channels, filter_channels, kernel_size, padding=kernel_size // 2)
+#         self.norm_1 = LayerNorm(filter_channels)
+#         self.conv_2 = torch.nn.Conv1d(filter_channels, filter_channels, kernel_size, padding=kernel_size // 2)
+#         self.norm_2 = LayerNorm(filter_channels)
+#         self.proj = torch.nn.Conv1d(filter_channels, 1, 1)
 
 #     def forward(self, x, x_mask):
-#         output = x * x_mask
-#         for layer in self.layers:
-#             if isinstance(layer, torch.nn.TransformerEncoderLayer):
-#                 output = output.transpose(1, 2)
-#                 output = layer(output)
-#                 output = output.transpose(1, 2)
-#             else:
-#                 output = layer(output)
-#             print(f"{layer.__class__.__name__:25}: {output.shape}")
-#         output = self.proj(x * x_mask)
-#         return output
+#         print(f"Input: {x.shape}")
+#         x = self.conv_1(x * x_mask)
+#         x = self.balancer(x)
+#         x = self.activation(x)
+#         print(f"Before norm: {x.shape}")
+#         x = self.norm_1(x)
+#         x = self.drop(x)
+#         x = self.conv_2(x * x_mask)
+#         x = self.balancer(x)
+#         x = self.activation(x)
+#         x = self.norm_2(x)
+#         x = self.drop(x)
+#         print(f"Before proj x: {x.shape}")
+#         print(f"Before proj x_mask: {x_mask.shape}")
+#         x = self.proj(x * x_mask)
+#         print(f"Output: {x.shape}")
+#         return x * x_mask
 
 
-# class DurationPredictor(Predictor):
-#     def __init__(self, input_dim, hidden_dim, **kwargs):
-#         super().__init__(input_dim, hidden_dim, dropout=0.5, **kwargs)
+class Predictor(BaseModule):
+    def __init__(self, input_dim, hidden_dim, num_layers=30, attention_layers_every=3, kernel_size=3, nhead=8, dropout=0.2):
+        super(Predictor, self).__init__()
+        assert num_layers % attention_layers_every == 0
+
+        self.layers = torch.nn.ModuleList()
+        self.layers.append(torch.nn.Conv1d(input_dim, hidden_dim, kernel_size=kernel_size, padding=kernel_size // 2))
+        for layer in range(num_layers):
+            self.layers.append(torch.nn.Conv1d(hidden_dim, hidden_dim, kernel_size=kernel_size, padding=kernel_size // 2))
+            self.layers.append(torch.nn.ReLU())
+            self.layers.append(LayerNorm(hidden_dim))
+            if layer % attention_layers_every == 2:
+                self.layers.append(torch.nn.TransformerEncoderLayer(hidden_dim, nhead, dropout=dropout))
+        self.proj = torch.nn.Conv1d(hidden_dim, 1, 1)
+
+    def forward(self, x, x_mask):
+        output = x * x_mask
+        for layer in self.layers:
+            if isinstance(layer, torch.nn.TransformerEncoderLayer):
+                output = output.transpose(1, 2)
+                output = layer(output)
+                output = output.transpose(1, 2)
+                output = output * x_mask
+            else:
+                output = layer(output)
+        output = self.proj(output)
+        output = output * x_mask
+        return output
 
 
-# class PitchPredictor(Predictor):
-#     def __init__(self, input_dim, hidden_dim, **kwargs):
-#         super().__init__(input_dim, hidden_dim, dropout=0.2, **kwargs)
+class DurationPredictor(Predictor):
+    def __init__(self, input_dim, hidden_dim, **kwargs):
+        super().__init__(input_dim, hidden_dim, dropout=0.5, **kwargs)
+
+
+class PitchPredictor(Predictor):
+    def __init__(self, input_dim, hidden_dim, **kwargs):
+        super().__init__(input_dim, hidden_dim, dropout=0.2, **kwargs)
 
 
 class MultiHeadAttention(BaseModule):
@@ -423,13 +426,8 @@ class TextEncoder(BaseModule):
         self.prenet = ConvSwishNorm(n_channels, n_channels, n_channels, kernel_size=5, n_layers=3, p_dropout=0.5)
         self.encoder = Encoder(n_channels + (spk_emb_dim if n_spks > 1 else 0), filter_channels, n_heads, n_layers, kernel_size, p_dropout, window_size=window_size)
         self.proj_m = torch.nn.Conv1d(n_channels + (spk_emb_dim if n_spks > 1 else 0), n_feats, 1)
-        # self.proj_w = DurationPredictor(n_channels + (spk_emb_dim if n_spks > 1 else 0), filter_channels_dp, kernel_size=kernel_size)
-        self.proj_w = DurationPredictor(
-            n_channels + (spk_emb_dim if n_spks > 1 else 0),
-            filter_channels_dp,
-            kernel_size,
-            p_dropout,
-        )
+        self.proj_w = DurationPredictor(n_channels + (spk_emb_dim if n_spks > 1 else 0), filter_channels_dp, kernel_size=kernel_size)
+        # self.proj_w = DurationPredictor(n_channels + (spk_emb_dim if n_spks > 1 else 0), filter_channels_dp, kernel_size, p_dropout)
 
     def forward(self, x, x_lengths, spk=None):
         x = self.emb(x) * math.sqrt(self.n_channels)
