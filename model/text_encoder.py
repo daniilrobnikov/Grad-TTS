@@ -155,9 +155,12 @@ class Predictor(BaseModule):
 
     def forward(self, x, x_mask):
         output = x * x_mask
+        print(f"input shape: {output.shape}")
         for layer in self.layers:
             output = layer(output)
+            print(f"{layer.__class__.__name__:25}: {output.shape}")
         output = self.proj(x * x_mask)
+        print(f"output shape: {output.shape}")
         return output
 
 
