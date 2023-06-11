@@ -419,13 +419,13 @@ class TextEncoder(BaseModule):
         self.prenet = ConvSwishNorm(n_channels, n_channels, n_channels, kernel_size=5, n_layers=3, p_dropout=0.5)
         self.encoder = Encoder(n_channels + (spk_emb_dim if n_spks > 1 else 0), filter_channels, n_heads, n_layers, kernel_size, p_dropout, window_size=window_size)
         self.proj_m = torch.nn.Conv1d(n_channels + (spk_emb_dim if n_spks > 1 else 0), n_feats, 1)
-        self.proj_w = DurationPredictor(n_channels + (spk_emb_dim if n_spks > 1 else 0), filter_channels_dp, kernel_size=kernel_size)
-        # self.proj_w = DurationPredictor(
-        #     n_channels + (spk_emb_dim if n_spks > 1 else 0),
-        #     filter_channels_dp,
-        #     kernel_size,
-        #     p_dropout,
-        # )
+        # self.proj_w = DurationPredictor(n_channels + (spk_emb_dim if n_spks > 1 else 0), filter_channels_dp, kernel_size=kernel_size)
+        self.proj_w = DurationPredictor(
+            n_channels + (spk_emb_dim if n_spks > 1 else 0),
+            filter_channels_dp,
+            kernel_size,
+            p_dropout,
+        )
 
     def forward(self, x, x_lengths, spk=None):
         x = self.emb(x) * math.sqrt(self.n_channels)
