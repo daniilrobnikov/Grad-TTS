@@ -89,6 +89,10 @@ class TextMelDataset(torch.utils.data.Dataset):
 
         frame_period = audio_np * 1000 / (sr * mel_length) + 1e-8
 
+        print(f"frame_period: {frame_period}")
+        print(f"mel_length: {mel_length}")
+        print(f"audio_np: {audio_np.shape}")
+
         _f0, t = pw.dio(audio_np, sr, frame_period=frame_period)  # raw pitch extractor
         f0 = pw.stonemask(audio_np, _f0, t, sr)  # pitch refinement
         f0 = torch.from_numpy(f0).float()
