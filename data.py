@@ -87,7 +87,7 @@ class TextMelDataset(torch.utils.data.Dataset):
         audio_np = audio.numpy()[0]
         audio_np = audio_np.astype(np.float64)
 
-        frame_period = audio_np * 1000 / (sr * mel_length) + 1e-8
+        frame_period = audio_np.shape[0] * 1000 / (sr * mel_length) + 1e-8
 
         print(f"frame_period: {frame_period}")
         print(f"mel_length: {mel_length}")
