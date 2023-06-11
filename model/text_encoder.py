@@ -98,6 +98,24 @@ class DurationPredictor(BaseModule):
         self.filter_channels = filter_channels
         self.p_dropout = p_dropout
 
+        # self.layers = torch.nn.ModuleList()
+        # num_layers = 2
+
+        # for _ in range(num_layers):
+        #     self.layers.append(
+        #         torch.nn.Conv1d(
+        #             in_channels,
+        #             filter_channels,
+        #             kernel_size,
+        #             padding=kernel_size // 2,
+        #         )
+        #     )
+        #     self.layers.append(ActivationBalancer(filter_channels, channel_dim=1))
+        #     self.layers.append(DoubleSwish())
+        #     self.layers.append(torch.nn.LayerNorm(filter_channels))
+        #     self.layers.append(torch.nn.Dropout(p_dropout))
+        # self.proj = torch.nn.Conv1d(filter_channels, 1, 1)
+
         self.balancer = ActivationBalancer(filter_channels, channel_dim=1)
         self.activation = DoubleSwish()
         self.drop = torch.nn.Dropout(p_dropout)
@@ -108,6 +126,7 @@ class DurationPredictor(BaseModule):
         self.proj = torch.nn.Conv1d(filter_channels, 1, 1)
 
     def forward(self, x, x_mask):
+        print(x.shape)
         x = self.conv_1(x * x_mask)
         x = self.balancer(x)
         x = self.activation(x)
@@ -119,6 +138,7 @@ class DurationPredictor(BaseModule):
         x = self.norm_2(x)
         x = self.drop(x)
         x = self.proj(x * x_mask)
+        print(x.shape)
         return x * x_mask
 
 
