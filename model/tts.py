@@ -157,15 +157,14 @@ class GradTTS(BaseModule):
         logw_ = torch.log(1e-8 + torch.sum(attn.unsqueeze(1), -1)) * x_mask
         dur_loss = duration_loss(logw, logw_, x_lengths)
 
-        # Compute loss between predicted pitch and ground truth y_pitch
-        # logp_ = torch.log(1e-8 + torch.sum(attn.unsqueeze(1), -1)) * x_mask
+        # Compute loss between predicted log-scaled pitch and ground truth y_pitch
+        # logp_ = torch.log(1e-8 + y_pitch) * y_mask
         # pitch_loss = pitch_loss_fn(logp_, y_pitch, x_lengths)
-        print(f"Then y shape: {y.shape}")
+
+        # pitch_loss = pitch_loss_fn(logp_, y_pitch, x_lengths)
+        print(f"\nThen y shape: {y.shape}")
         print(f"Then logw shape: {logw.shape}")
         print(f"Then y_pitch shape: {y_pitch.shape}")
-        # Print max and min of y_pitch
-        print(f"Max of y_pitch: {torch.max(y_pitch)}")
-        print(f"Min of y_pitch: {torch.min(y_pitch)}")
 
         # Cut a small segment of mel-spectrogram in order to increase batch size
         if not isinstance(out_size, type(None)):
