@@ -152,7 +152,7 @@ class Predictor(BaseModule):
         for layer in range(num_layers):
             self.layers.append(torch.nn.Conv1d(hidden_dim, hidden_dim, kernel_size=kernel_size, padding=kernel_size // 2))
             self.layers.append(torch.nn.ReLU())
-            self.layers.append(torch.nn.LayerNorm(hidden_dim, normalized_shape=1))
+            self.layers.append(LayerNorm(hidden_dim))
             if layer % attention_layers_every == 2:
                 self.layers.append(torch.nn.TransformerEncoderLayer(hidden_dim, nhead, hidden_dim, dropout))
         self.proj = torch.nn.Conv1d(hidden_dim, 1, 1)
