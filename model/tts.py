@@ -85,7 +85,7 @@ class GradTTS(BaseModule):
             # Get speaker embedding
             spk = self.spk_emb(spk)
 
-        # Get encoder_outputs `mu_x`, log-scaled token durations `logw`, log-scaled pitch `logp`
+        # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
         mu_x, logw, x_mask = self.encoder(x, x_lengths, spk)
 
         w = torch.exp(logw) * x_mask
@@ -112,7 +112,7 @@ class GradTTS(BaseModule):
 
         return encoder_outputs, decoder_outputs, attn[:, :, :y_max_length]
 
-    def compute_loss(self, x, x_lengths, y, y_lengths, y_pitch, spk=None, out_size=None):
+    def compute_loss(self, x, x_lengths, y, y_lengths, spk=None, out_size=None):
         """
         Computes 3 losses:
             1. duration loss: loss between predicted token durations and those extracted by Monotonic Alignment Search (MAS).
@@ -124,7 +124,6 @@ class GradTTS(BaseModule):
             x_lengths (torch.Tensor): lengths of texts in batch.
             y (torch.Tensor): batch of corresponding mel-spectrograms.
             y_lengths (torch.Tensor): lengths of mel-spectrograms in batch.
-            y_pitch (torch.Tensor): batch of corresponding pitch sequences.
             out_size (int, optional): length (in mel's sampling rate) of segment to cut, on which decoder will be trained.
                 Should be divisible by 2^{num of UNet downsamplings}. Needed to increase batch size.
         """
@@ -156,16 +155,6 @@ class GradTTS(BaseModule):
         # Compute loss between predicted log-scaled durations and those obtained from MAS
         logw_ = torch.log(1e-8 + torch.sum(attn.unsqueeze(1), -1)) * x_mask
         dur_loss = duration_loss(logw, logw_, x_lengths)
-
-        # Compute loss between predicted log-scaled pitch and ground truth y_pitch
-        # logp_ = torch.log(1e-8 + y_pitch) * y_mask
-        # pitch_loss = pitch_loss_fn(logp_, y_pitch, x_lengths)
-
-        # pitch_loss = pitch_loss_fn(logp_, y_pitch, x_lengths)
-        print(f"\nThen y shape: {y.shape}")
-        print(f"Theb x shape: {x.shape}")
-        print(f"Then logw shape: {logw.shape}")
-        print(f"Then y_pitch shape: {y_pitch.shape}")
 
         # Cut a small segment of mel-spectrogram in order to increase batch size
         if not isinstance(out_size, type(None)):

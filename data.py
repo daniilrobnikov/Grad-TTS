@@ -12,7 +12,6 @@ import numpy as np
 import torch
 import torch.utils.data
 import torchaudio as ta
-import pyworld as pw
 
 from text import text_to_sequence, cmudict
 from text.symbols import symbols
@@ -51,25 +50,15 @@ class TextMelDataset(torch.utils.data.Dataset):
         self.f_max = f_max
         random.shuffle(self.filepaths_and_text)
 
-    def get_triplet(self, filepath_and_text):
+    def get_pair(self, filepath_and_text):
         filepath, text = filepath_and_text[0], filepath_and_text[1]
+        text = self.get_text(text, add_blank=self.add_blank)
+        mel = self.get_mel(filepath)
+        return (text, mel)
 
+    def get_mel(self, filepath):
         audio, sr = ta.load(filepath)
         assert sr == self.sample_rate
-
-        text = self.get_text(text, add_blank=self.add_blank)
-        mel = self.get_mel(audio, sr)
-        pitch = self.get_pitch(audio, sr, mel.shape[1])  # pitch length is the same as mel length
-        return (text, mel, pitch)
-
-    def get_text(self, text, add_blank=True):
-        text_norm = text_to_sequence(text, dictionary=self.cmudict)
-        if self.add_blank:
-            text_norm = intersperse(text_norm, len(symbols))  # add a blank token, whose id number is len(symbols)
-        text_norm = torch.IntTensor(text_norm)
-        return text_norm
-
-    def get_mel(self, audio, sr):
         mel = mel_spectrogram(
             audio,
             self.n_fft,
@@ -83,20 +72,16 @@ class TextMelDataset(torch.utils.data.Dataset):
         ).squeeze()
         return mel
 
-    def get_pitch(self, audio, sr, mel_length):
-        audio_np = audio.numpy()[0]
-        audio_np = audio_np.astype(np.float64)
-
-        frame_period = audio_np.shape[0] * 1000 / (sr * mel_length) + 1e-12
-
-        _f0, t = pw.dio(audio_np, sr, frame_period=frame_period)  # raw pitch extractor
-        f0 = pw.stonemask(audio_np, _f0, t, sr)  # pitch refinement
-        f0 = torch.from_numpy(f0).float()
-        return f0
+    def get_text(self, text, add_blank=True):
+        text_norm = text_to_sequence(text, dictionary=self.cmudict)
+        if self.add_blank:
+            text_norm = intersperse(text_norm, len(symbols))  # add a blank token, whose id number is len(symbols)
+        text_norm = torch.IntTensor(text_norm)
+        return text_norm
 
     def __getitem__(self, index):
-        text, mel, pitch = self.get_triplet(self.filepaths_and_text[index])
-        item = {"y": mel, "x": text, "pitch": pitch}
+        text, mel = self.get_pair(self.filepaths_and_text[index])
+        item = {"y": mel, "x": text}
         return item
 
     def __len__(self):
@@ -120,20 +105,18 @@ class TextMelBatchCollate(object):
 
         y = torch.zeros((B, n_feats, y_max_length), dtype=torch.float32)
         x = torch.zeros((B, x_max_length), dtype=torch.long)
-        y_pitch = torch.zeros((B, y_max_length), dtype=torch.float32)
         y_lengths, x_lengths = [], []
 
         for i, item in enumerate(batch):
-            y_, x_, y_pitch_ = item["y"], item["x"], item["pitch"]
+            y_, x_ = item["y"], item["x"]
             y_lengths.append(y_.shape[-1])
             x_lengths.append(x_.shape[-1])
             y[i, :, : y_.shape[-1]] = y_
             x[i, : x_.shape[-1]] = x_
-            y_pitch[i, : y_pitch_.shape[-1]] = y_pitch_
 
         y_lengths = torch.LongTensor(y_lengths)
         x_lengths = torch.LongTensor(x_lengths)
-        return {"x": x, "x_lengths": x_lengths, "y": y, "y_lengths": y_lengths, "y_pitch": y_pitch}
+        return {"x": x, "x_lengths": x_lengths, "y": y, "y_lengths": y_lengths}
 
 
 class TextMelSpeakerDataset(torch.utils.data.Dataset):
