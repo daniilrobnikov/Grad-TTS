@@ -153,12 +153,11 @@ class Predictor(BaseModule):
                 self.layers.append(torch.nn.TransformerEncoderLayer(hidden_dim, nhead, hidden_dim, dropout))
         self.proj = torch.nn.Conv1d(hidden_dim, 1, 1)
 
-    def forward(self, src):
-        output = src
+    def forward(self, x, x_mask):
+        output = x * x_mask
         for layer in self.layers:
             output = layer(output)
-            print(f"{layer.__class__.__name__:20} {output.shape}")
-        output = self.proj(output)
+        output = self.proj(x * x_mask)
         return output
 
 
