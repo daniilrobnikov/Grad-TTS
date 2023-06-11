@@ -85,6 +85,8 @@ class GradTTS(BaseModule):
             # Get speaker embedding
             spk = self.spk_emb(spk)
 
+        print("Inference")
+
         # Get encoder_outputs `mu_x`, log-scaled token durations `logw`, log-scaled pitch `logp`
         mu_x, logw, x_mask = self.encoder(x, x_lengths, spk)
 
@@ -163,6 +165,7 @@ class GradTTS(BaseModule):
 
         # pitch_loss = pitch_loss_fn(logp_, y_pitch, x_lengths)
         print(f"\nThen y shape: {y.shape}")
+        print(f"Theb x shape: {x.shape}")
         print(f"Then logw shape: {logw.shape}")
         print(f"Then y_pitch shape: {y_pitch.shape}")
 
