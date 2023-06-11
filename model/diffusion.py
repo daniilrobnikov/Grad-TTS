@@ -85,7 +85,7 @@ class AttentionModule(nn.Module):
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x, mask):
-        print(f"AttentionModule input: {x.shape}, {mask.shape}")
+        print(f"AttentionModule forward: {x.shape}, {mask.shape}")
         # Trunk branch
         output_trunk = x * mask
         for block in self.trunk_branch:
@@ -109,6 +109,7 @@ class AttentionModule(nn.Module):
 class RANBlock(nn.Module):
     def __init__(self, dim, dim_out, time_emb_dim, groups=8):
         super(RANBlock, self).__init__()
+        print(f"RANBlock input: {dim}, {dim_out}, {time_emb_dim}")
 
         self.attention_module = AttentionModule(dim, dim_out, groups=groups)
         self.mlp = torch.nn.Sequential(nn.Mish(), torch.nn.Linear(time_emb_dim, dim_out))
@@ -119,6 +120,7 @@ class RANBlock(nn.Module):
             self.res_conv = torch.nn.Identity()
 
     def forward(self, x, mask, time_emb):
+        print(f"RANBlock forward: {x.shape}, {mask.shape}, {time_emb.shape}")
         h = self.attention_module(x, mask)
         h += self.mlp(time_emb).unsqueeze(-1).unsqueeze(-1)
         output = h + self.res_conv(x * mask)
