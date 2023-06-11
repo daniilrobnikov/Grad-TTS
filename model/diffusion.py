@@ -61,10 +61,16 @@ class Block(BaseModule):
 class MaskBlock(nn.Module):
     def __init__(self, dim, dim_out, groups=8):
         super(MaskBlock, self).__init__()
-        self.block = torch.nn.Sequential(torch.nn.Conv2d(dim, dim_out, 3, padding=1), torch.nn.GroupNorm(groups, dim_out), nn.Mish())
+        self.layer = nn.ModuleList()
+
+        self.layer.append(nn.Conv2d(dim, dim_out, 3, padding=1))
+        self.layer.append(nn.GroupNorm(groups, dim_out))
+        self.layer.append(nn.Mish())
 
     def forward(self, x):
-        output = self.block(x)
+        output = x
+        for layer in self.layer:
+            output = layer(output)
         return output
 
 
@@ -85,15 +91,14 @@ class AttentionModule(nn.Module):
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x, mask):
-        print(f"AttentionModule forward: {x.shape}, {mask.shape}")
         # Trunk branch
         output_trunk = x * mask
         for block in self.trunk_branch:
-            x = block(x)
+            output_trunk = block(output_trunk)
             output_trunk = output_trunk * mask
 
         # Mask branch
-        output_mask = output_trunk * mask
+        output_mask = x * mask
         for block in self.mask_branch:
             output_mask = block(output_mask)
         output_mask = output_mask * mask
@@ -101,7 +106,6 @@ class AttentionModule(nn.Module):
         output_mask = self.softmax(output_mask)
 
         # Combine both
-        print(f"AttentionModule output: {output_trunk.shape}, {output_mask.shape}")
         output = (1 + output_mask) * output_trunk
         return output
 
@@ -109,7 +113,6 @@ class AttentionModule(nn.Module):
 class RANBlock(nn.Module):
     def __init__(self, dim, dim_out, time_emb_dim, groups=8):
         super(RANBlock, self).__init__()
-        print(f"RANBlock input: {dim}, {dim_out}, {time_emb_dim}")
 
         self.attention_module = AttentionModule(dim, dim_out, groups=groups)
         self.mlp = torch.nn.Sequential(nn.Mish(), torch.nn.Linear(time_emb_dim, dim_out))
@@ -120,7 +123,6 @@ class RANBlock(nn.Module):
             self.res_conv = torch.nn.Identity()
 
     def forward(self, x, mask, time_emb):
-        print(f"RANBlock forward: {x.shape}, {mask.shape}, {time_emb.shape}")
         h = self.attention_module(x, mask)
         h += self.mlp(time_emb).unsqueeze(-1).unsqueeze(-1)
         output = h + self.res_conv(x * mask)
