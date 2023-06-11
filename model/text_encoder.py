@@ -154,13 +154,18 @@ class Predictor(BaseModule):
             self.layers.append(torch.nn.ReLU())
             self.layers.append(LayerNorm(hidden_dim))
             if layer % attention_layers_every == 2:
-                self.layers.append(torch.nn.TransformerEncoderLayer(hidden_dim, nhead, hidden_dim, dropout))
+                self.layers.append(torch.nn.TransformerEncoderLayer(hidden_dim, nhead, dropout=dropout))
         self.proj = torch.nn.Conv1d(hidden_dim, 1, 1)
 
     def forward(self, x, x_mask):
         output = x * x_mask
         for layer in self.layers:
-            output = layer(output)
+            if isinstance(layer, torch.nn.TransformerEncoderLayer):
+                output = output.transpose(1, 2)
+                output = layer(output)
+                output = output.transpose(1, 2)
+            else:
+                output = layer(output)
         output = self.proj(x * x_mask)
         return output
 
