@@ -77,7 +77,7 @@ class MaskBranch(nn.Module):
 
 
 class AttentionModule(nn.Module):
-    def __init__(self, dim, dim_out, p=2, t=2, r=1):
+    def __init__(self, dim, dim_out, p=1, t=2, r=1):
         super(AttentionModule, self).__init__()
 
         self.input_units = nn.ModuleList()
