@@ -14,6 +14,7 @@ class ResUnit(nn.Module):
         self.layer = nn.ModuleList()
         self.layer.append(nn.Conv2d(dim, dim_out, 3, padding=1))
         self.layer.append(nn.BatchNorm2d(dim_out))
+        self.layer.append(ActivationBalancer(dim_out, channel_dim=1))
         self.layer.append(DoubleSwish())
 
     def forward(self, x):
@@ -58,7 +59,9 @@ class MaskBranch(nn.Module):
         for _ in range(r):
             self.post_layer.append(ResUnit(dim_out, dim_out))
 
-        self.sigmoid = nn.Sigmoid()
+        self.conv1 = nn.Conv2d(dim_out, dim_out, 1)
+        self.conv2 = nn.Conv2d(dim_out, dim_out, 1)
+        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x, mask):
         output = x * mask
@@ -72,7 +75,9 @@ class MaskBranch(nn.Module):
         for layer in self.post_layer:
             output = layer(output)
         output = F.interpolate(output, size=x.shape[2:], mode='bilinear', align_corners=True)
-        output = self.sigmoid(output * mask)
+        output = self.conv1(output)
+        output = self.conv2(output)
+        output = self.softmax(output)
         return output * mask
 
 
@@ -110,14 +115,6 @@ class AttentionModule(nn.Module):
 
 
 class RANBlock(nn.Module):
-    r"""RAN Block
-
-    Args:
-        dim (int): Number of input channels.
-        dim_out (int): Number of output channels.
-        time_emb_dim (int): Dimension of time embedding.
-    """
-
     def __init__(self, dim, dim_out, time_emb_dim):
         super(RANBlock, self).__init__()
 
