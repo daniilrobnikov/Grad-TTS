@@ -11,6 +11,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange
+from model.RANBlock import RANBlock
 
 from model.base import BaseModule
 
@@ -58,77 +59,77 @@ class Block(BaseModule):
         return output * mask
 
 
-class MaskBlock(nn.Module):
-    def __init__(self, dim, dim_out, groups=8):
-        super(MaskBlock, self).__init__()
-        self.layer = nn.ModuleList()
+# class MaskBlock(nn.Module):
+#     def __init__(self, dim, dim_out, groups=8):
+#         super(MaskBlock, self).__init__()
+#         self.layer = nn.ModuleList()
 
-        self.layer.append(nn.Conv2d(dim, dim_out, 3, padding=1))
-        self.layer.append(nn.GroupNorm(groups, dim_out))
-        self.layer.append(nn.Mish())
+#         self.layer.append(nn.Conv2d(dim, dim_out, 3, padding=1))
+#         self.layer.append(nn.GroupNorm(groups, dim_out))
+#         self.layer.append(nn.Mish())
 
-    def forward(self, x):
-        output = x
-        for layer in self.layer:
-            output = layer(output)
-        return output
-
-
-class AttentionModule(nn.Module):
-    def __init__(self, dim, dim_out, groups=8):
-        super(AttentionModule, self).__init__()
-
-        self.trunk_branch = nn.ModuleList()
-        self.trunk_branch.append(MaskBlock(dim, dim_out, groups))
-        self.trunk_branch.append(MaskBlock(dim_out, dim_out, groups))
-
-        self.mask_branch = nn.ModuleList()
-        self.mask_branch.append(nn.AvgPool2d(3, stride=2, padding=1, count_include_pad=False))
-        self.mask_branch.append(MaskBlock(dim, dim_out, groups))
-        self.mask_branch.append(MaskBlock(dim_out, dim_out, groups))
-        # self.mask_branch.append(nn.UpsamplingBilinear2d(scale_factor=2))
-
-        self.softmax = nn.Softmax(dim=1)
-
-    def forward(self, x, mask):
-        # Trunk branch
-        output_trunk = x * mask
-        for block in self.trunk_branch:
-            output_trunk = block(output_trunk)
-            output_trunk = output_trunk * mask
-
-        # Mask branch
-        output_mask = x * mask
-        for block in self.mask_branch:
-            output_mask = block(output_mask)
-        # Upsample to original size
-        output_mask = F.interpolate(output_mask, size=x.shape[2:], mode='bilinear', align_corners=True)
-        output_mask = output_mask * mask
-
-        output_mask = self.softmax(output_mask)
-
-        # Combine both
-        output = (1 + output_mask) * output_trunk
-        return output
+#     def forward(self, x):
+#         output = x
+#         for layer in self.layer:
+#             output = layer(output)
+#         return output
 
 
-class RANBlock(nn.Module):
-    def __init__(self, dim, dim_out, time_emb_dim, groups=8):
-        super(RANBlock, self).__init__()
+# class AttentionModule(nn.Module):
+#     def __init__(self, dim, dim_out, groups=8):
+#         super(AttentionModule, self).__init__()
 
-        self.attention_module = AttentionModule(dim, dim_out, groups=groups)
-        self.mlp = torch.nn.Sequential(nn.Mish(), torch.nn.Linear(time_emb_dim, dim_out))
+#         self.trunk_branch = nn.ModuleList()
+#         self.trunk_branch.append(MaskBlock(dim, dim_out, groups))
+#         self.trunk_branch.append(MaskBlock(dim_out, dim_out, groups))
 
-        if dim != dim_out:
-            self.res_conv = torch.nn.Conv2d(dim, dim_out, 1)
-        else:
-            self.res_conv = torch.nn.Identity()
+#         self.mask_branch = nn.ModuleList()
+#         self.mask_branch.append(nn.AvgPool2d(3, stride=2, padding=1, count_include_pad=False))
+#         self.mask_branch.append(MaskBlock(dim, dim_out, groups))
+#         self.mask_branch.append(MaskBlock(dim_out, dim_out, groups))
+#         # self.mask_branch.append(nn.UpsamplingBilinear2d(scale_factor=2))
 
-    def forward(self, x, mask, time_emb):
-        h = self.attention_module(x, mask)
-        h += self.mlp(time_emb).unsqueeze(-1).unsqueeze(-1)
-        output = h + self.res_conv(x * mask)
-        return output
+#         self.softmax = nn.Softmax(dim=1)
+
+#     def forward(self, x, mask):
+#         # Trunk branch
+#         output_trunk = x * mask
+#         for block in self.trunk_branch:
+#             output_trunk = block(output_trunk)
+#             output_trunk = output_trunk * mask
+
+#         # Mask branch
+#         output_mask = x * mask
+#         for block in self.mask_branch:
+#             output_mask = block(output_mask)
+#         # Upsample to original size
+#         output_mask = F.interpolate(output_mask, size=x.shape[2:], mode='bilinear', align_corners=True)
+#         output_mask = output_mask * mask
+
+#         output_mask = self.softmax(output_mask)
+
+#         # Combine both
+#         output = (1 + output_mask) * output_trunk
+#         return output
+
+
+# class RANBlock(nn.Module):
+#     def __init__(self, dim, dim_out, time_emb_dim, groups=8):
+#         super(RANBlock, self).__init__()
+
+#         self.attention_module = AttentionModule(dim, dim_out, groups=groups)
+#         self.mlp = torch.nn.Sequential(nn.Mish(), torch.nn.Linear(time_emb_dim, dim_out))
+
+#         if dim != dim_out:
+#             self.res_conv = torch.nn.Conv2d(dim, dim_out, 1)
+#         else:
+#             self.res_conv = torch.nn.Identity()
+
+#     def forward(self, x, mask, time_emb):
+#         h = self.attention_module(x, mask)
+#         h += self.mlp(time_emb).unsqueeze(-1).unsqueeze(-1)
+#         output = h + self.res_conv(x * mask)
+#         return output
 
 
 # class ResnetBlock(BaseModule):
