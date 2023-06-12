@@ -86,7 +86,7 @@ class AttentionModule(nn.Module):
         self.mask_branch.append(nn.AvgPool2d(3, stride=2, padding=1, count_include_pad=False))
         self.mask_branch.append(MaskBlock(dim, dim_out, groups))
         self.mask_branch.append(MaskBlock(dim_out, dim_out, groups))
-        self.mask_branch.append(nn.UpsamplingBilinear2d(scale_factor=2))
+        # self.mask_branch.append(nn.UpsamplingBilinear2d(scale_factor=2))
 
         self.softmax = nn.Softmax(dim=1)
 
@@ -101,6 +101,8 @@ class AttentionModule(nn.Module):
         output_mask = x * mask
         for block in self.mask_branch:
             output_mask = block(output_mask)
+        # Upsample to original size
+        output_mask = F.interpolate(output_mask, size=x.shape[2:], mode='bilinear', align_corners=True)
         output_mask = output_mask * mask
 
         output_mask = self.softmax(output_mask)
