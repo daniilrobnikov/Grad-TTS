@@ -31,12 +31,10 @@ class TrunkBranch(nn.Module):
         for _ in range(t - 1):
             self.layer.append(ResUnit(dim_out, dim_out))
 
-    def forward(self, x, mask):
-        output = x * mask
+    def forward(self, x):
         for layer in self.layer:
-            output = layer(output)
-            output = output * mask
-        return output
+            x = layer(x)
+        return x
 
 
 class MaskBranch(nn.Module):
@@ -61,21 +59,20 @@ class MaskBranch(nn.Module):
         self.conv1 = nn.Conv2d(dim_out, dim_out, 1)
         self.conv2 = nn.Conv2d(dim_out, dim_out, 1)
 
-    def forward(self, x, mask):
-        output = x * mask
+    def forward(self, x):
         for layer in self.pre_layer:
-            output = layer(output)
+            x = layer(x)
 
         for layer in self.layer:
-            output = layer(output)
-        output = F.interpolate(output, size=x.shape[2:], mode='bilinear', align_corners=True)
+            x = layer(x)
+        x = F.interpolate(x, size=x.shape[2:], mode='bilinear', align_corners=True)
 
         for layer in self.post_layer:
-            output = layer(output)
-        output = F.interpolate(output, size=x.shape[2:], mode='bilinear', align_corners=True)
-        output = self.conv1(output)
-        output = self.conv2(output)
-        return output * mask
+            x = layer(x)
+        x = F.interpolate(x, size=x.shape[2:], mode='bilinear', align_corners=True)
+        x = self.conv1(x)
+        x = self.conv2(x)
+        return x
 
 
 class AttentionModule(nn.Module):
@@ -94,20 +91,21 @@ class AttentionModule(nn.Module):
             self.output_units.append(ResUnit(dim_out, dim_out))
 
     def forward(self, x, mask):
+        output = x * mask
         # Input units
         for layer in self.input_units:
-            x = layer(x * mask)
+            x = layer(x)
 
         # Trunk branch
-        output_trunk = self.trunk_branch(x, mask)
+        output_trunk = self.trunk_branch(x)
         # Mask branch
-        output_mask = self.mask_branch(x, mask)
+        output_mask = self.mask_branch(x)
         # Combine both
         output = (1 + output_mask) * output_trunk
 
         # Output units
         for layer in self.input_units:
-            x = layer(x * mask)
+            output = layer(output)
         return output * mask
 
 
