@@ -60,7 +60,6 @@ class MaskBranch(nn.Module):
 
         self.conv1 = nn.Conv2d(dim_out, dim_out, 1)
         self.conv2 = nn.Conv2d(dim_out, dim_out, 1)
-        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x, mask):
         output = x * mask
@@ -76,7 +75,6 @@ class MaskBranch(nn.Module):
         output = F.interpolate(output, size=x.shape[2:], mode='bilinear', align_corners=True)
         output = self.conv1(output)
         output = self.conv2(output)
-        output = self.softmax(output)
         return output * mask
 
 
