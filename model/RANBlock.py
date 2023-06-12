@@ -12,16 +12,15 @@ class ResUnit(nn.Module):
     def __init__(self, dim, dim_out):
         super(ResUnit, self).__init__()
         self.layer = nn.ModuleList()
-        self.layer.append(nn.Conv2d(dim, dim_out, 3, padding=1))
-        self.layer.append(nn.BatchNorm2d(dim_out))
-        self.layer.append(ActivationBalancer(dim_out, channel_dim=1))
+        self.layer.append(nn.BatchNorm2d(dim))
+        self.layer.append(ActivationBalancer(dim, channel_dim=1))
         self.layer.append(DoubleSwish())
+        self.layer.append(nn.Conv2d(dim, dim_out, 3, padding=1))
 
     def forward(self, x):
-        output = x
         for layer in self.layer:
-            output = layer(output)
-        return output
+            x = layer(x)
+        return x
 
 
 class TrunkBranch(nn.Module):
