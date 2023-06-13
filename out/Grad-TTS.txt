@@ -1,0 +1,1 @@
+Grad-TTS is a text-to-speech model with score-based decoder producing mel-spectrograms by gradually transforming noise predicted by encoder and aligned with text input by means of Monotonic Alignment Search.
